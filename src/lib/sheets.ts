@@ -1,0 +1,109 @@
+import { google } from 'googleapis';
+import { unstable_cache } from 'next/cache';
+
+const SHEET_RANGE = 'Datos_Actuales!A:DY';
+
+export type ServiceRow = {
+  id: string;
+  proyecto: string;
+  gestor: string;
+  cargoGestor: string;
+  estado: string;
+  ciudad: string;
+  direccion: string;
+  nombreTrabajador: string;
+  identTrabajador: string;
+  placa: string;
+  razonCancelacion: string;
+  descCancelacion: string;
+  diaSolicitud: number | null;
+  anioSolicitud: number | null;
+  mesSolicitud: string;
+  fechaSolicitud: string;
+  horaServicio: string;
+  fechaCreacion: string;
+  horaCreacion: string;
+};
+
+function getAuth() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
+  const credentials = JSON.parse(raw);
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+}
+
+async function fetchRowsUncached(): Promise<ServiceRow[]> {
+  const spreadsheetId = process.env.MONITOREO_SHEET_ID;
+  if (!spreadsheetId) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
+
+  const sheets = google.sheets({ version: 'v4', auth: getAuth() });
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: SHEET_RANGE,
+    valueRenderOption: 'UNFORMATTED_VALUE',
+    dateTimeRenderOption: 'FORMATTED_STRING',
+  });
+
+  const values = res.data.values || [];
+  if (values.length < 2) return [];
+  const headers = values[0] as string[];
+  const idx = (name: string) => headers.indexOf(name);
+
+  const COLS = {
+    id: idx('ID Servicio'),
+    proyecto: idx('PROYECTO'),
+    gestor: idx('GESTOR'),
+    cargoGestor: idx('CARGO GESTOR'),
+    estado: idx('Estado'),
+    ciudad: idx('Ciudad'),
+    direccion: idx('Dirección de Origen'),
+    nombreTrabajador: idx('Nombre Trabajador'),
+    identTrabajador: idx('Ident. Trabajador'),
+    placa: idx('Placa'),
+    razonCancelacion: idx('Razon de Cancelacion'),
+    descCancelacion: idx('Descripcion de Cancelacion'),
+    diaSolicitud: idx('DÍA SOLICITUD'),
+    anioSolicitud: idx('AÑO SOLICITUD'),
+    mesSolicitud: idx('MES SOLICITUD'),
+    fechaSolicitud: idx('FECHA SOLICITUD'),
+    horaServicio: idx('HORA DE SERVICIO'),
+    fechaCreacion: idx('FECHA CREACIÓN'),
+    horaCreacion: idx('HORA DE CREACIÓN'),
+  };
+
+  const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
+
+  return (values.slice(1) as unknown[][])
+    .map((row) => ({
+      id: String(get(row, COLS.id)),
+      proyecto: String(get(row, COLS.proyecto) || 'SIN PROYECTO'),
+      gestor: String(get(row, COLS.gestor) || 'SIN GESTOR'),
+      cargoGestor: String(get(row, COLS.cargoGestor) || ''),
+      estado: String(get(row, COLS.estado) || 'Sin estado'),
+      ciudad: String(get(row, COLS.ciudad) || 'SIN CIUDAD'),
+      direccion: String(get(row, COLS.direccion) || ''),
+      nombreTrabajador: String(get(row, COLS.nombreTrabajador) || '').trim(),
+      identTrabajador: String(get(row, COLS.identTrabajador) || '').trim(),
+      placa: String(get(row, COLS.placa) || '').trim(),
+      razonCancelacion: String(get(row, COLS.razonCancelacion) || ''),
+      descCancelacion: String(get(row, COLS.descCancelacion) || ''),
+      diaSolicitud: Number(get(row, COLS.diaSolicitud)) || null,
+      anioSolicitud: Number(get(row, COLS.anioSolicitud)) || null,
+      mesSolicitud: String(get(row, COLS.mesSolicitud) || ''),
+      fechaSolicitud: String(get(row, COLS.fechaSolicitud) || ''),
+      horaServicio: String(get(row, COLS.horaServicio) || ''),
+      fechaCreacion: String(get(row, COLS.fechaCreacion) || ''),
+      horaCreacion: String(get(row, COLS.horaCreacion) || ''),
+    }))
+    .filter((r) => r.id);
+}
+
+// Se refresca sola cada 90s: cualquiera que abra el panel ve datos frescos
+// sin necesidad de un botón de "actualizar", y sin golpear la API de
+// Sheets en cada carga de página.
+export const getServiceRows = unstable_cache(fetchRowsUncached, ['service-rows'], {
+  revalidate: 90,
+});
