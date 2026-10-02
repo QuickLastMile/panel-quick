@@ -21,10 +21,10 @@ export default function StackedBarList({
       <div className="space-y-2">
         {totals.map((t) => (
           <div key={t.key} className="grid grid-cols-[140px_1fr_42px] items-center gap-3">
-            <span className="truncate text-xs font-medium text-slate-600" title={t.key}>
+            <span className="truncate text-xs font-medium text-[var(--text-secondary)]" title={t.key}>
               {t.key}
             </span>
-            <div className="flex h-4 overflow-hidden rounded bg-slate-100">
+            <div className="flex h-4 overflow-hidden rounded bg-[var(--surface-sunken)]">
               {STATUS_ORDER.map((st) => {
                 const c = lookup[t.key]?.[st] || 0;
                 if (!c) return null;
@@ -32,19 +32,20 @@ export default function StackedBarList({
                 return (
                   <div
                     key={st}
+                    className="animate-grow-width transition-[filter] duration-150 hover:brightness-110"
                     style={{ width: `${pct}%`, background: STATUS_COLOR[st] }}
                     title={`${t.key} · ${st}: ${c}`}
                   />
                 );
               })}
             </div>
-            <span className="text-right text-xs tabular-nums text-slate-500">{t.count.toLocaleString('es-CO')}</span>
+            <span className="text-right text-xs tabular-nums text-[var(--text-secondary)]">{t.count.toLocaleString('es-CO')}</span>
           </div>
         ))}
       </div>
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
         {STATUS_ORDER.map((st) => (
-          <span key={st} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span key={st} className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
             <span className="h-2 w-2 rounded-[2px]" style={{ background: STATUS_COLOR[st] }} />
             {st}
           </span>

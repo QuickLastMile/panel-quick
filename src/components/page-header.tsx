@@ -12,14 +12,14 @@ export default function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-bold tracking-wide text-blue-700 uppercase">{eyebrow}</p>
-        <h1 className="text-2xl font-bold text-slate-900">
-          {title} <span className="text-blue-700">{accent}</span>
+        <p className="text-xs font-bold tracking-wide text-[var(--accent-bright)] uppercase">{eyebrow}</p>
+        <h1 className="text-2xl font-bold text-[var(--text)]">
+          {title} <span className="text-gradient-gold">{accent}</span>
         </h1>
       </div>
       {asOf && (
-        <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500">
-          Datos al corte de <b className="text-slate-800">{asOf}</b>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--text-secondary)]">
+          Datos al corte de <b className="text-[var(--text)]">{asOf}</b>
         </span>
       )}
     </div>

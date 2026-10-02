@@ -23,27 +23,27 @@ export default async function ConfiguracionPage() {
     <div>
       <PageHeader eyebrow="Configuración" title="Parámetros de la" accent="automatización" />
 
-      <div className="max-w-xl rounded-xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
+      <div className="panel-card max-w-xl rounded-xl p-5">
         <table className="w-full text-sm">
           <tbody>
             {ROWS.map(([k, v]) => (
-              <tr key={k} className="border-b border-slate-100">
-                <td className="py-2.5 text-slate-500">{k}</td>
-                <td className="py-2.5 text-right font-semibold text-slate-800">{v}</td>
+              <tr key={k} className="border-b border-[var(--border)]">
+                <td className="py-2.5 text-[var(--text-secondary)]">{k}</td>
+                <td className="py-2.5 text-right font-semibold text-[var(--text)]">{v}</td>
               </tr>
             ))}
-            <tr>
-              <td className="py-2.5 text-slate-500">Total servicios cargados</td>
-              <td className="py-2.5 text-right font-semibold text-slate-800">{rows.length.toLocaleString('es-CO')}</td>
+            <tr className="border-b border-[var(--border)]">
+              <td className="py-2.5 text-[var(--text-secondary)]">Total servicios cargados</td>
+              <td className="py-2.5 text-right font-semibold text-[var(--text)]">{rows.length.toLocaleString('es-CO')}</td>
             </tr>
             <tr>
-              <td className="py-2.5 text-slate-500">Última sincronización real</td>
-              <td className="py-2.5 text-right font-semibold text-slate-800">{syncLabel}</td>
+              <td className="py-2.5 text-[var(--text-secondary)]">Última sincronización real</td>
+              <td className="py-2.5 text-right font-semibold text-[var(--text)]">{syncLabel}</td>
             </tr>
           </tbody>
         </table>
 
-        <div className="mt-5 flex gap-2.5 rounded-lg bg-blue-50 p-3 text-xs text-blue-900">
+        <div className="mt-5 flex gap-2.5 rounded-lg bg-[var(--accent-soft)] p-3 text-xs text-[var(--accent-bright)]">
           <span>🔒</span>
           <span>
             Esta página es visible solo para el perfil Administrador. La edición de parámetros en vivo aún no está

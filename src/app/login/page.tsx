@@ -7,14 +7,18 @@ export default async function LoginPage({
 }) {
   const { next } = await searchParams;
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl shadow-slate-900/5">
-        <div className="flex flex-col items-center gap-1 mb-6">
-          <div className="flex items-center gap-2 text-2xl font-bold text-blue-700">
-            <span className="h-3 w-3 rotate-45 rounded-[3px] bg-blue-600" />
-            QUICK
-          </div>
-          <p className="text-sm text-slate-500">Centro de Operaciones</p>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg)] px-4">
+      <div
+        className="pointer-events-none absolute -top-40 left-1/2 h-[560px] w-[560px] -translate-x-1/2 rounded-full opacity-25 blur-3xl"
+        style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)' }}
+      />
+      <div className="relative w-full max-w-sm animate-fade-in-up rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-2xl shadow-black/40">
+        <div className="mb-6 flex flex-col items-center gap-1.5">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-gold text-lg font-black text-[#141008] shadow-[0_0_22px_rgba(214,164,25,0.3)]">
+            Q
+          </span>
+          <div className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)]">QUICK</div>
+          <p className="text-sm text-[var(--text-muted)]">Centro de Operaciones</p>
         </div>
         <LoginForm next={next ?? '/dashboard'} />
       </div>

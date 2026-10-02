@@ -75,19 +75,27 @@ export default function GestionClient({ gestion }: { gestion: Record<string, Ges
           <button
             key={g}
             onClick={() => selectGroup(g)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${
-              group === g ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-all duration-150 ${
+              group === g
+                ? 'border-[var(--accent)] bg-gradient-gold text-[#141008] shadow-[0_0_14px_rgba(214,164,25,0.22)]'
+                : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text)]'
             }`}
           >
             <StatusPill status={g} />
-            <span className={group === g ? 'rounded-full bg-white/20 px-1.5 py-0.5 text-white' : 'rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-500'}>
+            <span
+              className={
+                group === g
+                  ? 'rounded-full bg-black/15 px-1.5 py-0.5 text-[#141008]'
+                  : 'rounded-full bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[var(--text-muted)]'
+              }
+            >
               {(gestion[g] || []).length.toLocaleString('es-CO')}
             </span>
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
+      <div className="panel-card rounded-xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <input
             value={search}
@@ -96,12 +104,12 @@ export default function GestionClient({ gestion }: { gestion: Record<string, Ges
               setPage(0);
             }}
             placeholder="Buscar por ID, dirección, proyecto, gestor…"
-            className="w-72 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs outline-none focus:border-blue-400"
+            className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
           />
-          <span className="text-xs text-slate-400">{filtered.length.toLocaleString('es-CO')} servicios</span>
+          <span className="text-xs text-[var(--text-muted)]">{filtered.length.toLocaleString('es-CO')} servicios</span>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-100">
+        <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
           <table className="w-full min-w-[800px] border-collapse text-xs">
             <thead>
               <tr>
@@ -109,8 +117,8 @@ export default function GestionClient({ gestion }: { gestion: Record<string, Ges
                   <th
                     key={c.key}
                     onClick={() => toggleSort(c.key)}
-                    className={`cursor-pointer whitespace-nowrap border-b border-slate-100 bg-slate-50 px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide ${
-                      sort.col === c.key ? 'text-blue-700' : 'text-slate-400'
+                    className={`cursor-pointer whitespace-nowrap border-b border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide transition-colors ${
+                      sort.col === c.key ? 'text-[var(--accent-bright)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                     }`}
                   >
                     {c.label} {sort.col === c.key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
@@ -121,15 +129,18 @@ export default function GestionClient({ gestion }: { gestion: Record<string, Ges
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={cols.length} className="px-3 py-10 text-center text-slate-400">
+                  <td colSpan={cols.length} className="px-3 py-10 text-center text-[var(--text-muted)]">
                     Sin servicios en este estado con el filtro actual.
                   </td>
                 </tr>
               ) : (
                 pageRows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50">
+                  <tr key={row.id} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                     {cols.map((c, i) => (
-                      <td key={c.key} className={`whitespace-nowrap px-3 py-2 ${i === 0 ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
+                      <td
+                        key={c.key}
+                        className={`whitespace-nowrap px-3 py-2 ${i === 0 ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-secondary)]'}`}
+                      >
                         {String(row[c.key] || '—')}
                       </td>
                     ))}
@@ -141,21 +152,21 @@ export default function GestionClient({ gestion }: { gestion: Record<string, Ges
         </div>
 
         {filtered.length > 0 && (
-          <div className="mt-3 flex items-center justify-end gap-3 text-xs text-slate-500">
+          <div className="mt-3 flex items-center justify-end gap-3 text-xs text-[var(--text-secondary)]">
             <span>
               Página {page + 1} de {maxPage + 1}
             </span>
             <button
               disabled={page === 0}
               onClick={() => setPage((p) => p - 1)}
-              className="rounded-md border border-slate-200 px-2.5 py-1 font-semibold disabled:opacity-40"
+              className="rounded-md border border-[var(--border)] px-2.5 py-1 font-semibold transition-colors hover:border-[var(--border-strong)] disabled:opacity-40"
             >
               ← Anterior
             </button>
             <button
               disabled={page === maxPage}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-md border border-slate-200 px-2.5 py-1 font-semibold disabled:opacity-40"
+              className="rounded-md border border-[var(--border)] px-2.5 py-1 font-semibold transition-colors hover:border-[var(--border-strong)] disabled:opacity-40"
             >
               Siguiente →
             </button>

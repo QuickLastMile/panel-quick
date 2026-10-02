@@ -5,7 +5,7 @@ export default function StatusPill({ status }: { status: string }) {
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
-      style={{ background: `${color}1f`, color }}
+      style={{ background: `${color}2e`, color }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
       {status}
