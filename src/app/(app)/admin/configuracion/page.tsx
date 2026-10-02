@@ -1,4 +1,4 @@
-import { getServiceRows } from '@/lib/sheets';
+import { getSheetsSnapshot } from '@/lib/sheets';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 
@@ -14,7 +14,10 @@ const ROWS: [string, string][] = [
 
 export default async function ConfiguracionPage() {
   await requireRole(['admin']);
-  const rows = await getServiceRows();
+  const { rows, lastSyncedAt } = await getSheetsSnapshot();
+  const syncLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+    : 'sin sincronizar aún';
 
   return (
     <div>
@@ -32,6 +35,10 @@ export default async function ConfiguracionPage() {
             <tr>
               <td className="py-2.5 text-slate-500">Total servicios cargados</td>
               <td className="py-2.5 text-right font-semibold text-slate-800">{rows.length.toLocaleString('es-CO')}</td>
+            </tr>
+            <tr>
+              <td className="py-2.5 text-slate-500">Última sincronización real</td>
+              <td className="py-2.5 text-right font-semibold text-slate-800">{syncLabel}</td>
             </tr>
           </tbody>
         </table>

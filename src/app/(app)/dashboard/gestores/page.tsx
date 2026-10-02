@@ -1,23 +1,43 @@
-import { getServiceRows } from '@/lib/sheets';
+import { getSheetsSnapshot } from '@/lib/sheets';
 import { buildDashboardData } from '@/lib/aggregate';
+import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
+import DateFilterBar from '@/components/date-filter';
 import RankingBarList from '@/components/charts/ranking-bar-list';
 
-export default async function GestoresPage() {
+export default async function GestoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireRole(['admin', 'supervisor']);
-  const rows = await getServiceRows();
+  const filter = parseDateFilterParams(await searchParams);
+  const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
+  const rows = filterRowsByDate(allRows, filter);
   const data = buildDashboardData(rows);
-  const asOf = new Date(data.generadoEn).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+  const syncLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
+    : 'sin sincronizar aún';
 
   return (
     <div>
-      <PageHeader eyebrow="Seguimiento" title="Productividad por" accent="gestor" asOf={asOf} />
+      <PageHeader
+        eyebrow="Seguimiento"
+        title="Productividad por"
+        accent={`gestor — ${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}`}
+        asOf={`Última sincronización: ${syncLabel}`}
+      />
+      <DateFilterBar filter={filter} />
 
       <div className="mb-5 rounded-xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
         <h2 className="text-sm font-bold text-slate-800">Servicios por gestor</h2>
         <p className="mb-4 text-xs text-slate-400">Volumen total gestionado — todos los estados (excluye &quot;OTRO&quot;)</p>
-        <RankingBarList items={data.gestorStats.map((g) => ({ key: g.gestor, count: g.total }))} color="#2563eb" />
+        {data.gestorStats.length ? (
+          <RankingBarList items={data.gestorStats.map((g) => ({ key: g.gestor, count: g.total }))} color="#2563eb" />
+        ) : (
+          <p className="py-8 text-center text-sm text-slate-400">Sin servicios para esta fecha.</p>
+        )}
       </div>
 
       <div className="rounded-xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">

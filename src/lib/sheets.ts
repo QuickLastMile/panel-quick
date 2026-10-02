@@ -35,20 +35,33 @@ function getAuth() {
   });
 }
 
-async function fetchRowsUncached(): Promise<ServiceRow[]> {
+export type SheetsSnapshot = {
+  rows: ServiceRow[];
+  // Hora real de la última sincronización exitosa con Quick (la escribe la
+  // automatización en Resumen!B1) — distinta de "cuándo se renderizó esta
+  // página". Null si nunca ha corrido o la celda está vacía.
+  lastSyncedAt: string | null;
+};
+
+async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
   const spreadsheetId = process.env.MONITOREO_SHEET_ID;
   if (!spreadsheetId) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
 
   const sheets = google.sheets({ version: 'v4', auth: getAuth() });
-  const res = await sheets.spreadsheets.values.get({
+  const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
-    range: SHEET_RANGE,
+    // H1 (no B1: esa es parte de la celda combinada del título y nunca se
+    // puede leer de vuelta) — ver automation/lib/sheets.mjs.
+    ranges: [SHEET_RANGE, 'Resumen!H1'],
     valueRenderOption: 'UNFORMATTED_VALUE',
     dateTimeRenderOption: 'FORMATTED_STRING',
   });
 
-  const values = res.data.values || [];
-  if (values.length < 2) return [];
+  const [dataRange, syncRange] = res.data.valueRanges || [];
+  const lastSyncedAt = String(syncRange?.values?.[0]?.[0] || '') || null;
+
+  const values = dataRange?.values || [];
+  if (values.length < 2) return { rows: [], lastSyncedAt };
   const headers = values[0] as string[];
   const idx = (name: string) => headers.indexOf(name);
 
@@ -76,7 +89,7 @@ async function fetchRowsUncached(): Promise<ServiceRow[]> {
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
 
-  return (values.slice(1) as unknown[][])
+  const rows = (values.slice(1) as unknown[][])
     .map((row) => ({
       id: String(get(row, COLS.id)),
       proyecto: String(get(row, COLS.proyecto) || 'SIN PROYECTO'),
@@ -99,11 +112,13 @@ async function fetchRowsUncached(): Promise<ServiceRow[]> {
       horaCreacion: String(get(row, COLS.horaCreacion) || ''),
     }))
     .filter((r) => r.id);
+
+  return { rows, lastSyncedAt };
 }
 
 // Se refresca sola cada 90s: cualquiera que abra el panel ve datos frescos
 // sin necesidad de un botón de "actualizar", y sin golpear la API de
 // Sheets en cada carga de página.
-export const getServiceRows = unstable_cache(fetchRowsUncached, ['service-rows'], {
+export const getSheetsSnapshot = unstable_cache(fetchSnapshotUncached, ['service-rows'], {
   revalidate: 90,
 });
