@@ -1,21 +1,18 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
+import { getConfiguracionRows, getRangoConfig } from '@/lib/configuracion';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
+import RangoEditor from './rango-editor';
 
-const ROWS: [string, string][] = [
-  ['Tipo de reporte', 'Servicios'],
-  ['Línea de negocio', 'Logística Última Milla'],
-  ['País', 'Todos'],
-  ['Estado', 'Todos'],
-  ['Usuario', 'Todos'],
-  ['Rango móvil', '3 días atrás a 8 días adelante'],
-  ['Frecuencia objetivo', '30 minutos'],
-];
+// Estas dos viven en su propia fila editable (RangoEditor) — no se
+// duplican en la tabla informativa de abajo.
+const HIDDEN_LABELS = new Set(['Días hacia atrás', 'Días hacia adelante']);
 
 export default async function ConfiguracionPage() {
-  await requireRole(['admin']);
+  const role = await requireRole(['admin']);
   const { rows, lastSyncedAt } = await getSheetsSnapshot();
+  const [configRows, rango] = await Promise.all([getConfiguracionRows(), getRangoConfig()]);
   const syncLabel = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
     : 'sin sincronizar aún';
@@ -28,12 +25,15 @@ export default async function ConfiguracionPage() {
       <div className="panel-card max-w-xl rounded-xl p-5">
         <table className="w-full text-sm">
           <tbody>
-            {ROWS.map(([k, v]) => (
-              <tr key={k} className="border-b border-[var(--border)]">
-                <td className="py-2.5 text-[var(--text-secondary)]">{k}</td>
-                <td className="py-2.5 text-right font-semibold text-[var(--text)]">{v}</td>
-              </tr>
-            ))}
+            <RangoEditor rango={rango} canEdit={role === 'admin'} />
+            {configRows
+              .filter((r) => !HIDDEN_LABELS.has(r.parametro))
+              .map((r) => (
+                <tr key={r.parametro} className="border-b border-[var(--border)]">
+                  <td className="py-2.5 text-[var(--text-secondary)]">{r.parametro}</td>
+                  <td className="py-2.5 text-right font-semibold text-[var(--text)]">{r.valor}</td>
+                </tr>
+              ))}
             <tr className="border-b border-[var(--border)]">
               <td className="py-2.5 text-[var(--text-secondary)]">Total servicios cargados</td>
               <td className="py-2.5 text-right font-semibold text-[var(--text)]">{rows.length.toLocaleString('es-CO')}</td>
@@ -48,9 +48,9 @@ export default async function ConfiguracionPage() {
         <div className="mt-5 flex gap-2.5 rounded-lg bg-[var(--accent-soft)] p-3 text-xs text-[var(--accent-bright)]">
           <span>🔒</span>
           <span>
-            Esta página es visible solo para el perfil Administrador. La edición de parámetros en vivo aún no está
-            conectada desde este panel — por ahora refleja los valores de la pestaña <b>Configuracion</b> de la hoja
-            de monitoreo; los cambios reales se hacen allí.
+            El <b>rango de descarga</b> ya está conectado en vivo: lo que cambies acá lo lee la automatización en su próxima corrida
+            programada (cada 30 min), directo desde la pestaña <b>Configuracion</b> del Sheet — sin necesidad de tocar código. Los demás
+            parámetros de esta lista son solo informativos por ahora.
           </span>
         </div>
       </div>
