@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback } from 'react';
+import { SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ServiceRow } from '@/lib/sheets';
 import StatusPill from '@/components/status-pill';
 import ServiceDetailPanel from '@/components/service-detail-panel';
@@ -75,6 +76,7 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
   const [sort, setSort] = useState<{ col: keyof ServiceRow; dir: 'asc' | 'desc' }>({ col: 'fechaSolicitud', dir: 'desc' });
   const [page, setPage] = useState(0);
   const [selectedRow, setSelectedRow] = useState<ServiceRow | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   const [fProyecto, setFProyecto] = useState('');
   const [fJefatura, setFJefatura] = useState('');
@@ -176,10 +178,70 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
     { label: 'Servicio', value: fServicio, set: setFServicio, options: filterOptions.servicio },
     { label: 'Ciudad', value: fCiudad, set: setFCiudad, options: filterOptions.ciudad },
   ];
+  const activeFilterCount = FILTERS.filter((f) => f.value).length;
+
+  function clearFilters() {
+    setFProyecto('');
+    setFJefatura('');
+    setFTipoServicio('');
+    setFServicio('');
+    setFCiudad('');
+    setPage(0);
+  }
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors ${
+            showFilters
+              ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-bright)]'
+              : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text)]'
+          }`}
+        >
+          <SlidersHorizontal size={13} />
+          Filtros
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[10px] text-[#141008]">{activeFilterCount}</span>
+          )}
+          {showFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        {activeFilterCount > 0 && (
+          <button onClick={clearFilters} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {showFilters && (
+        <div className="panel-card mb-3 rounded-lg p-3">
+          <div className="flex flex-wrap items-end gap-2.5">
+            {FILTERS.map((f) => (
+              <label key={f.label} className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{f.label}</span>
+                <select
+                  value={f.value}
+                  onChange={(e) => {
+                    f.set(e.target.value);
+                    setPage(0);
+                  }}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2 py-1 text-[11px] font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+                >
+                  <option value="">Todos</option>
+                  {f.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-2">
         {GROUPS.map((g) => {
           const active = group === g;
           const color = STATUS_COLOR[g] || '#8a8a8a';
@@ -204,46 +266,6 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
             </button>
           );
         })}
-      </div>
-
-      <div className="panel-card mb-4 rounded-xl p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          {FILTERS.map((f) => (
-            <label key={f.label} className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{f.label}</span>
-              <select
-                value={f.value}
-                onChange={(e) => {
-                  f.set(e.target.value);
-                  setPage(0);
-                }}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
-              >
-                <option value="">Todos</option>
-                {f.options.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          {(fProyecto || fJefatura || fTipoServicio || fServicio || fCiudad) && (
-            <button
-              onClick={() => {
-                setFProyecto('');
-                setFJefatura('');
-                setFTipoServicio('');
-                setFServicio('');
-                setFCiudad('');
-                setPage(0);
-              }}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-bright)] hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          )}
-        </div>
       </div>
 
       <div className="panel-card rounded-xl p-4">
