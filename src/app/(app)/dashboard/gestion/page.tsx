@@ -1,5 +1,5 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData } from '@/lib/aggregate';
+import { isSinClasificar } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
@@ -14,8 +14,8 @@ export default async function GestionPage({
   await requireRole(['admin', 'supervisor']);
   const filter = parseDateFilterParams(await searchParams);
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
-  const rows = filterRowsByDate(allRows, filter);
-  const data = buildDashboardData(rows);
+  // Excluye "OTRO"/"OTROS"/"NN" — son proyectos sin clasificar, no reales.
+  const rows = filterRowsByDate(allRows, filter).filter((r) => !isSinClasificar(r.proyecto));
   const syncLabel = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
     : 'sin sincronizar aún';
@@ -29,7 +29,7 @@ export default async function GestionPage({
         asOf={`Última sincronización: ${syncLabel}`}
       />
       <DateFilterBar filter={filter} />
-      <GestionClient gestion={data.gestion} />
+      <GestionClient rows={rows} />
     </div>
   );
 }

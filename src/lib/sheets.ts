@@ -26,6 +26,13 @@ export type ServiceRow = {
   jefatura: string;
   servicio: string;
   tipoServicio: string;
+  valorDeclarado: number | null;
+  precioTotal: number | null;
+  ganancias: number | null;
+  zona: string;
+  email: string;
+  descripcion: string;
+  diasAnticipadosCreacion: number | null;
 };
 
 function getAuth() {
@@ -92,9 +99,20 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     jefatura: idx('JEFATURA'),
     servicio: idx('Servicio'),
     tipoServicio: idx('Tipo de Servicio'),
+    valorDeclarado: idx('Valor Declarado'),
+    precioTotal: idx('Precio Total'),
+    ganancias: idx('Ganancias'),
+    zona: idx('Zona'),
+    email: idx('Email'),
+    descripcion: idx('Descripcion'),
+    diasAnticipadosCreacion: idx('DÍAS ANTICIPADAS DE CREACIÓN'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
+  const getNum = (row: unknown[], i: number) => {
+    const n = Number(get(row, i));
+    return Number.isFinite(n) && get(row, i) !== '' ? n : null;
+  };
 
   const rows = (values.slice(1) as unknown[][])
     .map((row) => ({
@@ -121,6 +139,13 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       jefatura: String(get(row, COLS.jefatura) || '').trim(),
       servicio: String(get(row, COLS.servicio) || ''),
       tipoServicio: String(get(row, COLS.tipoServicio) || ''),
+      valorDeclarado: getNum(row, COLS.valorDeclarado),
+      precioTotal: getNum(row, COLS.precioTotal),
+      ganancias: getNum(row, COLS.ganancias),
+      zona: String(get(row, COLS.zona) || ''),
+      email: String(get(row, COLS.email) || ''),
+      descripcion: String(get(row, COLS.descripcion) || ''),
+      diasAnticipadosCreacion: getNum(row, COLS.diasAnticipadosCreacion),
     }))
     .filter((r) => r.id);
 

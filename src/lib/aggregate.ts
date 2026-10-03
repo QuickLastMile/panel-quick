@@ -2,6 +2,10 @@ import type { ServiceRow } from './sheets';
 
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
 
+export function isSinClasificar(value: string): boolean {
+  return SIN_CLASIFICAR.has(value.toUpperCase());
+}
+
 function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
@@ -21,23 +25,6 @@ export function normEstado(estado: string): string {
 function bump(map: Record<string, number>, key: string) {
   map[key] = (map[key] || 0) + 1;
 }
-
-export type GestionRow = Pick<
-  ServiceRow,
-  | 'id'
-  | 'proyecto'
-  | 'ciudad'
-  | 'direccion'
-  | 'fechaSolicitud'
-  | 'horaServicio'
-  | 'fechaCreacion'
-  | 'horaCreacion'
-  | 'gestor'
-  | 'nombreTrabajador'
-  | 'identTrabajador'
-  | 'placa'
-  | 'razonCancelacion'
->;
 
 export type GestorStat = {
   gestor: string;
@@ -60,7 +47,6 @@ export type DashboardData = {
   horaCiudad: { ciudad: string; hora: number; fuente: 'servicio' | 'creacion'; count: number }[];
   porServicio: { key: string; count: number }[];
   porTipoServicio: { key: string; count: number }[];
-  gestion: Record<string, GestionRow[]>;
   gestorStats: GestorStat[];
 };
 
@@ -147,24 +133,6 @@ export function buildTrendData(rows: ServiceRow[]): TrendData {
   return { mesProyecto, diaProyecto };
 }
 
-function pickGestion(r: ServiceRow): GestionRow {
-  return {
-    id: r.id,
-    proyecto: r.proyecto,
-    ciudad: r.ciudad,
-    direccion: r.direccion,
-    fechaSolicitud: r.fechaSolicitud,
-    horaServicio: r.horaServicio,
-    fechaCreacion: r.fechaCreacion,
-    horaCreacion: r.horaCreacion,
-    gestor: r.gestor,
-    nombreTrabajador: r.nombreTrabajador,
-    identTrabajador: r.identTrabajador,
-    placa: r.placa,
-    razonCancelacion: r.razonCancelacion,
-  };
-}
-
 export function buildDashboardData(rows: ServiceRow[]): DashboardData {
   const porEstadoMap: Record<string, number> = {};
   rows.forEach((r) => bump(porEstadoMap, normEstado(r.estado)));
@@ -198,18 +166,6 @@ export function buildDashboardData(rows: ServiceRow[]): DashboardData {
     if (r.servicio) bump(porServicioMap, r.servicio);
     if (r.tipoServicio) bump(porTipoServicioMap, r.tipoServicio);
   });
-
-  const gestion: Record<string, GestionRow[]> = {
-    'En Espera': rows.filter((r) => r.estado === 'En Espera').map(pickGestion),
-    'Relanzado': rows.filter((r) => r.estado === 'Relanzado').map(pickGestion),
-    'Asignado': rows.filter((r) => r.estado === 'Asignado').map(pickGestion),
-    'En Tránsito': rows.filter((r) => r.estado === 'En Transito' || r.estado === 'En Tránsito').map(pickGestion),
-    'Finalizado': rows.filter((r) => r.estado === 'Finalizado').map(pickGestion),
-    'Cancelado': rows.filter((r) => r.estado === 'Cancelado' || r.estado === 'Finalizado Cancelado').map(pickGestion),
-  };
-  const conocidos = new Set(['En Espera', 'Relanzado', 'Asignado', 'En Transito', 'En Tránsito', 'Finalizado', 'Cancelado', 'Finalizado Cancelado']);
-  const otros = rows.filter((r) => !conocidos.has(r.estado)).map(pickGestion);
-  if (otros.length) gestion['Otros'] = otros;
 
   const porGestor: Record<string, { cargo: string; total: number; finalizado: number; cancelado: number; enProceso: number }> = {};
   rows.forEach((r) => {
@@ -258,7 +214,6 @@ export function buildDashboardData(rows: ServiceRow[]): DashboardData {
     }),
     porServicio: toPairs(porServicioMap).sort((a, b) => b.count - a.count),
     porTipoServicio: toPairs(porTipoServicioMap).sort((a, b) => b.count - a.count),
-    gestion,
     gestorStats,
   };
 }
