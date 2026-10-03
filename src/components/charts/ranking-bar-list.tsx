@@ -14,8 +14,8 @@ export default function RankingBarList({
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-3 sm:grid-cols-[180px_1fr_42px]">
-          <span className="text-xs font-medium leading-tight text-[var(--text-secondary)] sm:truncate" title={item.key}>
+        <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-3 sm:grid-cols-[210px_1fr_42px]">
+          <span className="text-xs font-medium leading-tight text-[var(--text-secondary)]" title={item.key}>
             {item.key}
           </span>
           <div className="col-span-2 h-4 overflow-hidden rounded bg-[var(--surface-sunken)] sm:col-span-1">

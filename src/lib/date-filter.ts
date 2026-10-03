@@ -22,7 +22,7 @@ export function bogotaToday(): { year: number; month: number; day: number } {
 }
 
 // FECHA SOLICITUD viene de Quick como "D/M/AAAA" (sin ceros a la izquierda).
-function parseFechaSolicitud(fecha: string): { year: number; month: number; day: number } | null {
+export function parseFechaSolicitud(fecha: string): { year: number; month: number; day: number } | null {
   const parts = fecha.split('/');
   if (parts.length !== 3) return null;
   const day = Number(parts[0]);
@@ -40,6 +40,16 @@ export function parseDateFilterParams(searchParams: Record<string, string | stri
   const month = Number(searchParams.month) || today.month;
   const day = Number(searchParams.day) || today.day;
   return { mode, year, month, day };
+}
+
+export type SimpleDate = { year: number; month: number; day: number };
+
+// Para comparar fechas simples (sin hora) de forma segura con aritmética de
+// calendario UTC — evita sorpresas de huso horario al restar directamente.
+export function daysBetween(a: SimpleDate, b: SimpleDate): number {
+  const da = Date.UTC(a.year, a.month - 1, a.day);
+  const db = Date.UTC(b.year, b.month - 1, b.day);
+  return Math.round((db - da) / 86400000);
 }
 
 export function isToday(filter: DateFilter): boolean {
