@@ -1,6 +1,7 @@
 import { ExternalLink, CheckCircle2, XCircle, CircleDashed, Loader2 } from 'lucide-react';
 import { requireRole } from '@/lib/session';
 import { getRunsSnapshot, normalizeStatus } from '@/lib/github-runs';
+import { formatBogotaDateTime, formatBogotaDate, formatBogotaTime } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
 
@@ -54,9 +55,7 @@ export default async function HistorialPage() {
                 <span>
                   Fallando desde{' '}
                   <b>
-                    {snapshot.failingSince
-                      ? new Date(snapshot.failingSince).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-                      : '—'}
+                    {snapshot.failingSince ? formatBogotaDateTime(snapshot.failingSince) : '—'}
                   </b>{' '}
                   — {snapshot.consecutiveFailures} corrida{snapshot.consecutiveFailures === 1 ? '' : 's'} seguida
                   {snapshot.consecutiveFailures === 1 ? '' : 's'} sin éxito. Puede que la sesión de Quick haya expirado
@@ -101,10 +100,10 @@ export default async function HistorialPage() {
                     return (
                       <tr key={run.id} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                         <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">
-                          {created.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {formatBogotaDate(created)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-[var(--text-secondary)]">
-                          {created.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                          {formatBogotaTime(created)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">
                           {EVENT_LABEL[run.event] || run.event}

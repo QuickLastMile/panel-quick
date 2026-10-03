@@ -1,6 +1,7 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getDirectorio, emptyDirectorioEntry } from '@/lib/directorio';
 import { isSinClasificar } from '@/lib/aggregate';
+import { formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DirectorioClient from './directorio-client';
@@ -11,9 +12,7 @@ export default async function DirectorioPage() {
   const role = await requireRole(['admin', 'supervisor']);
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const directorio = await getDirectorio();
-  const syncLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-    : 'sin sincronizar aún';
+  const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   // Nombre más reciente visto por cada Ident. Trabajador en los datos reales.
   const seenNames = new Map<string, string>();

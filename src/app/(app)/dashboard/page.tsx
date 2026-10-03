@@ -1,7 +1,7 @@
 import { Package, Clock, UserCheck, Truck, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { buildDashboardData, buildTrendData, listJefaturas, filterRowsByJefatura } from '@/lib/aggregate';
-import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday } from '@/lib/date-filter';
+import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -44,9 +44,7 @@ export default async function ResumenPage({
   const trend = buildTrendData(jefaturaRows);
 
   const byEstado = Object.fromEntries(data.porEstado.map((e) => [e.key, e.count]));
-  const syncLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-    : 'sin sincronizar aún';
+  const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
     <div>

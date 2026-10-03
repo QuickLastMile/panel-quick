@@ -1,6 +1,7 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getConfiguracionRows, getRangoConfig } from '@/lib/configuracion';
 import { requireRole } from '@/lib/session';
+import { formatBogotaDateTime } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
 import RangoEditor from './rango-editor';
@@ -13,9 +14,7 @@ export default async function ConfiguracionPage() {
   const role = await requireRole(['admin']);
   const { rows, lastSyncedAt } = await getSheetsSnapshot();
   const [configRows, rango] = await Promise.all([getConfiguracionRows(), getRangoConfig()]);
-  const syncLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-    : 'sin sincronizar aún';
+  const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
     <div>

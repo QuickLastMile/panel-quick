@@ -76,3 +76,30 @@ export function formatDateFilterLabel(filter: DateFilter): string {
   if (filter.mode === 'month') return `${MONTH_NAMES[filter.month - 1]} ${filter.year}`;
   return `${filter.day} de ${MONTH_NAMES[filter.month - 1]} de ${filter.year}`;
 }
+
+// Vercel corre el servidor en UTC: sin forzar timeZone, toLocaleString muestra
+// la hora UTC cruda (5 horas adelante de Bogotá) en vez de la hora local real.
+export function formatBogotaDateTime(date: Date | string | number): string {
+  return new Date(date).toLocaleString('es-CO', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Bogota',
+  });
+}
+
+export function formatBogotaDate(date: Date | string | number): string {
+  return new Date(date).toLocaleDateString('es-CO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'America/Bogota',
+  });
+}
+
+export function formatBogotaTime(date: Date | string | number): string {
+  return new Date(date).toLocaleTimeString('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Bogota',
+  });
+}

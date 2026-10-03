@@ -1,6 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { buildDashboardData, isSinClasificar } from '@/lib/aggregate';
-import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday } from '@/lib/date-filter';
+import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -17,9 +17,7 @@ export default async function GestoresPage({
   const cleanRows = allRows.filter((r) => !isSinClasificar(r.proyecto));
   const rows = filterRowsByDate(cleanRows, filter);
   const data = buildDashboardData(rows);
-  const syncLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-    : 'sin sincronizar aún';
+  const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
     <div>
