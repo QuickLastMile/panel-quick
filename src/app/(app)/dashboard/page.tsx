@@ -85,18 +85,21 @@ export default async function ResumenPage({
         )}
       </ChartCard>
 
-      <div className="mb-5 grid gap-5 md:grid-cols-2">
-        <ChartCard title="Servicios por franja horaria" description="Tendencia por hora del día — servicio o solicitud">
-          <FranjaChart horaCiudad={data.horaCiudad} ciudades={data.porCiudad.map((c) => c.key)} />
-        </ChartCard>
-        <ChartCard title="Servicios por ciudad" description="Top 14 ciudades — desglose por estado">
-          {data.porCiudad.length ? (
-            <StackedBarList totals={data.porCiudad} byKey={data.ciudadEstado.map((c) => ({ proyecto: c.ciudad, estado: c.estado, count: c.count }))} />
-          ) : (
-            <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
-          )}
-        </ChartCard>
-      </div>
+      <ChartCard
+        title="Servicios por franja horaria"
+        description="Tendencia por hora del día — servicio o solicitud. Solo muestra el rango de horas con datos."
+        className="mb-5"
+      >
+        <FranjaChart horaCiudad={data.horaCiudad} ciudades={data.porCiudad.map((c) => c.key)} />
+      </ChartCard>
+
+      <ChartCard title="Servicios por ciudad" description="Top 14 ciudades — desglose por estado" className="mb-5">
+        {data.porCiudad.length ? (
+          <StackedBarList totals={data.porCiudad} byKey={data.ciudadEstado.map((c) => ({ proyecto: c.ciudad, estado: c.estado, count: c.count }))} />
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
+        )}
+      </ChartCard>
 
       <div className="mb-5 grid gap-5 md:grid-cols-2">
         <ChartCard title="Servicios por tipo de jornada" description='Columna "Servicio" — Vuelta / Día / Medio día'>
@@ -125,7 +128,7 @@ export default async function ResumenPage({
 
       <ChartCard
         title="Tendencia por día"
-        description="Histórico completo, independiente del filtro de día — filtra por mes y proyecto desde aquí"
+        description="Una línea por estado. Histórico completo, independiente del filtro de día — filtra por mes y proyecto desde aquí"
       >
         <DiaTrendChart diaProyecto={trend.diaProyecto} />
       </ChartCard>

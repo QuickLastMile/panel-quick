@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import TrendLineChart from './trend-line-chart';
+import MultiTrendLineChart from './multi-trend-line-chart';
+import { STATUS_ORDER, STATUS_COLOR } from '@/lib/status-colors';
 import type { DiaProyectoPoint } from '@/lib/aggregate';
 
 export default function DiaTrendChart({ diaProyecto }: { diaProyecto: DiaProyectoPoint[] }) {
@@ -22,17 +23,30 @@ export default function DiaTrendChart({ diaProyecto }: { diaProyecto: DiaProyect
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
   }, [diaProyecto, mes]);
 
-  const points = useMemo(() => {
-    const map: Record<string, { label: string; value: number }> = {};
+  const series = useMemo(() => {
+    const fechas = new Map<string, string>();
     diaProyecto.forEach((p) => {
       if (mes && p.mes !== mes) return;
       if (proyecto && p.proyecto !== proyecto) return;
-      if (!map[p.fecha]) map[p.fecha] = { label: p.fechaLabel, value: 0 };
-      map[p.fecha].value += p.count;
+      fechas.set(p.fecha, p.fechaLabel);
     });
-    return Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([, v]) => v);
+    const fechaKeys = Array.from(fechas.keys()).sort((a, b) => a.localeCompare(b));
+
+    return STATUS_ORDER.map((estado) => {
+      const byFecha: Record<string, number> = {};
+      diaProyecto.forEach((p) => {
+        if (p.estado !== estado) return;
+        if (mes && p.mes !== mes) return;
+        if (proyecto && p.proyecto !== proyecto) return;
+        byFecha[p.fecha] = (byFecha[p.fecha] || 0) + p.count;
+      });
+      return {
+        key: estado,
+        label: estado,
+        color: STATUS_COLOR[estado] || '#8a8a8a',
+        points: fechaKeys.map((f) => ({ label: fechas.get(f) || f, value: byFecha[f] || 0 })),
+      };
+    });
   }, [diaProyecto, mes, proyecto]);
 
   return (
@@ -66,7 +80,7 @@ export default function DiaTrendChart({ diaProyecto }: { diaProyecto: DiaProyect
           ))}
         </select>
       </div>
-      <TrendLineChart points={points} emptyMessage="Sin servicios para este filtro." />
+      <MultiTrendLineChart series={series} emptyMessage="Sin servicios para este filtro." />
     </div>
   );
 }

@@ -81,7 +81,15 @@ export function filterRowsByJefatura(rows: ServiceRow[], jefatura: string): Serv
 }
 
 export type MesProyectoPoint = { mes: string; mesLabel: string; proyecto: string; count: number };
-export type DiaProyectoPoint = { fecha: string; fechaLabel: string; mes: string; mesLabel: string; proyecto: string; count: number };
+export type DiaProyectoPoint = {
+  fecha: string;
+  fechaLabel: string;
+  mes: string;
+  mesLabel: string;
+  proyecto: string;
+  estado: string;
+  count: number;
+};
 
 export type TrendData = {
   mesProyecto: MesProyectoPoint[];
@@ -94,7 +102,7 @@ export type TrendData = {
 // tiempo; su propio filtro de proyecto/mes vive dentro de cada gráfica.
 export function buildTrendData(rows: ServiceRow[]): TrendData {
   const mesMap: Record<string, { mesLabel: string; proyecto: string; count: number }> = {};
-  const diaMap: Record<string, { mesLabel: string; mes: string; proyecto: string; count: number }> = {};
+  const diaMap: Record<string, { mesLabel: string; mes: string; proyecto: string; estado: string; count: number }> = {};
 
   rows.forEach((r) => {
     if (SIN_CLASIFICAR.has(r.proyecto.toUpperCase())) return;
@@ -106,10 +114,11 @@ export function buildTrendData(rows: ServiceRow[]): TrendData {
     mesMap[mk].count += 1;
 
     if (r.diaSolicitud) {
+      const estado = normEstado(r.estado);
       const diaKey = `${mesKey}-${pad2(r.diaSolicitud)}`;
-      const dk = `${diaKey}|||${r.proyecto}`;
+      const dk = `${diaKey}|||${r.proyecto}|||${estado}`;
       if (!diaMap[dk]) {
-        diaMap[dk] = { mesLabel, mes: mesKey, proyecto: r.proyecto, count: 0 };
+        diaMap[dk] = { mesLabel, mes: mesKey, proyecto: r.proyecto, estado, count: 0 };
       }
       diaMap[dk].count += 1;
     }
@@ -123,7 +132,15 @@ export function buildTrendData(rows: ServiceRow[]): TrendData {
     .map(([k, v]) => {
       const fecha = k.split('|||')[0];
       const [, , d] = fecha.split('-');
-      return { fecha, fechaLabel: `${d}/${v.mes.split('-')[1]}`, mes: v.mes, mesLabel: v.mesLabel, proyecto: v.proyecto, count: v.count };
+      return {
+        fecha,
+        fechaLabel: `${d}/${v.mes.split('-')[1]}`,
+        mes: v.mes,
+        mesLabel: v.mesLabel,
+        proyecto: v.proyecto,
+        estado: v.estado,
+        count: v.count,
+      };
     })
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 

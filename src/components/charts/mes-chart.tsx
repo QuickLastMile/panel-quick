@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import TrendLineChart from './trend-line-chart';
+import BarTrendChart from './bar-trend-chart';
 import type { MesProyectoPoint } from '@/lib/aggregate';
 
 export default function MesChart({ mesProyecto }: { mesProyecto: MesProyectoPoint[] }) {
@@ -41,7 +41,7 @@ export default function MesChart({ mesProyecto }: { mesProyecto: MesProyectoPoin
           ))}
         </select>
       </div>
-      <TrendLineChart points={points} emptyMessage="Aún no hay histórico suficiente para mostrar tendencia mensual." />
+      <BarTrendChart points={points} emptyMessage="Aún no hay histórico suficiente para mostrar tendencia mensual." />
     </div>
   );
 }

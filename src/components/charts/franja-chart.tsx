@@ -22,7 +22,17 @@ export default function FranjaChart({
       if (ciudad && p.ciudad !== ciudad) return;
       byHour[p.hora] += p.count;
     });
-    return byHour.map((value, hora) => ({ label: `${String(hora).padStart(2, '0')}h`, value }));
+    // Recorta las horas sin datos al inicio/fin (ej. de 2am a 5am nadie pide
+    // servicios) en vez de siempre mostrar el rango fijo 00h-23h.
+    let start = byHour.findIndex((v) => v > 0);
+    let end = byHour.length - 1 - [...byHour].reverse().findIndex((v) => v > 0);
+    if (start === -1) {
+      start = 0;
+      end = 23;
+    }
+    return byHour
+      .slice(start, end + 1)
+      .map((value, i) => ({ label: `${String(start + i).padStart(2, '0')}:00`, value }));
   }, [horaCiudad, ciudad, fuente]);
 
   return (
