@@ -1,6 +1,7 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
+import ConfigTabs from '@/components/config-tabs';
 
 const ROWS: [string, string][] = [
   ['Tipo de reporte', 'Servicios'],
@@ -8,7 +9,7 @@ const ROWS: [string, string][] = [
   ['País', 'Todos'],
   ['Estado', 'Todos'],
   ['Usuario', 'Todos'],
-  ['Rango móvil', 'Hoy y mañana'],
+  ['Rango móvil', '3 días atrás a 8 días adelante'],
   ['Frecuencia objetivo', '30 minutos'],
 ];
 
@@ -22,6 +23,7 @@ export default async function ConfiguracionPage() {
   return (
     <div>
       <PageHeader eyebrow="Configuración" title="Parámetros de la" accent="automatización" />
+      <ConfigTabs />
 
       <div className="panel-card max-w-xl rounded-xl p-5">
         <table className="w-full text-sm">

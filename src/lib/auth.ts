@@ -12,7 +12,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 // Importante: '/dashboard' no debe autorizar '/dashboard/gestion' solo por
 // compartir el prefijo; cada ruta protegida se lista explícitamente.
 export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
-  admin: ['/dashboard', '/dashboard/gestion', '/dashboard/gestores', '/admin/configuracion'],
+  admin: ['/dashboard', '/dashboard/gestion', '/dashboard/gestores', '/admin/configuracion', '/admin/configuracion/historial'],
   supervisor: ['/dashboard', '/dashboard/gestion', '/dashboard/gestores'],
   coordinador: ['/dashboard'],
 };
