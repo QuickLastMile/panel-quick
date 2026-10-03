@@ -1,14 +1,18 @@
 import { Package, Clock, UserCheck, Truck, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData } from '@/lib/aggregate';
+import { buildDashboardData, buildTrendData, listJefaturas, filterRowsByJefatura } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
+import JefaturaTabs from '@/components/jefatura-tabs';
 import StatCard from '@/components/stat-card';
+import ChartCard from '@/components/charts/chart-card';
 import StackedBarList from '@/components/charts/stacked-bar-list';
 import RankingBarList from '@/components/charts/ranking-bar-list';
 import FranjaChart from '@/components/charts/franja-chart';
+import MesChart from '@/components/charts/mes-chart';
+import DiaTrendChart from '@/components/charts/dia-trend-chart';
 
 const STATUS_ICON = {
   'En Espera': Clock,
@@ -24,10 +28,21 @@ export default async function ResumenPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const filter = parseDateFilterParams(await searchParams);
+  const sp = await searchParams;
+  const filter = parseDateFilterParams(sp);
+  const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
+
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
-  const rows = filterRowsByDate(allRows, filter);
+  const jefaturas = listJefaturas(allRows);
+
+  const jefaturaRows = filterRowsByJefatura(allRows, jefaturaParam);
+  const rows = filterRowsByDate(jefaturaRows, filter);
   const data = buildDashboardData(rows);
+  // Mes y tendencia por día se calculan sobre el histórico completo (solo
+  // acotado por jefatura), a propósito desacoplados del filtro de día/mes de
+  // la página — cada uno trae su propio filtro de proyecto/mes.
+  const trend = buildTrendData(jefaturaRows);
+
   const byEstado = Object.fromEntries(data.porEstado.map((e) => [e.key, e.count]));
   const syncLabel = lastSyncedAt
     ? new Date(lastSyncedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
@@ -42,6 +57,7 @@ export default async function ResumenPage({
         asOf={`Última sincronización: ${syncLabel} · ${data.totalServicios.toLocaleString('es-CO')} servicios`}
       />
 
+      <JefaturaTabs jefaturas={jefaturas} selected={jefaturaParam} />
       <DateFilterBar filter={filter} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
@@ -57,39 +73,62 @@ export default async function ResumenPage({
         ))}
       </div>
 
-      <div className="panel-card mb-5 rounded-xl p-5">
-        <h2 className="text-sm font-bold text-[var(--text)]">Servicios por proyecto y estado</h2>
-        <p className="mb-4 text-xs text-[var(--text-muted)]">
-          Acumulado por proyecto solicitante — fecha de solicitud. Top 14 por volumen (excluye &quot;OTRO&quot;, sin
-          clasificar).
-        </p>
+      <ChartCard
+        title="Servicios por proyecto y estado"
+        description='Acumulado por proyecto solicitante — fecha de solicitud. Top 14 por volumen, o enfoca uno (excluye "OTRO"/"NN").'
+        className="mb-5"
+      >
         {data.porProyecto.length ? (
-          <StackedBarList totals={data.porProyecto.slice(0, 14)} byKey={data.proyectoEstado} />
+          <StackedBarList totals={data.porProyecto} byKey={data.proyectoEstado} selectable selectPlaceholder="Top 14 proyectos" />
         ) : (
           <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
         )}
-      </div>
+      </ChartCard>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="panel-card rounded-xl p-5">
-          <h2 className="text-sm font-bold text-[var(--text)]">Servicios por franja horaria</h2>
-          <p className="mb-2 text-xs text-[var(--text-muted)]">Hora de servicio solicitada, por ciudad</p>
-          <FranjaChart
-            porFranja={data.porFranja}
-            franjaCiudad={data.franjaCiudad}
-            ciudades={data.porCiudad.map((c) => c.key)}
-          />
-        </div>
-        <div className="panel-card rounded-xl p-5">
-          <h2 className="text-sm font-bold text-[var(--text)]">Servicios por ciudad</h2>
-          <p className="mb-4 text-xs text-[var(--text-muted)]">Top 14 ciudades por volumen de solicitudes</p>
+      <div className="mb-5 grid gap-5 md:grid-cols-2">
+        <ChartCard title="Servicios por franja horaria" description="Tendencia por hora del día — servicio o solicitud">
+          <FranjaChart horaCiudad={data.horaCiudad} ciudades={data.porCiudad.map((c) => c.key)} />
+        </ChartCard>
+        <ChartCard title="Servicios por ciudad" description="Top 14 ciudades — desglose por estado">
           {data.porCiudad.length ? (
-            <RankingBarList items={data.porCiudad.slice(0, 14)} />
+            <StackedBarList totals={data.porCiudad} byKey={data.ciudadEstado.map((c) => ({ proyecto: c.ciudad, estado: c.estado, count: c.count }))} />
           ) : (
             <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
           )}
-        </div>
+        </ChartCard>
       </div>
+
+      <div className="mb-5 grid gap-5 md:grid-cols-2">
+        <ChartCard title="Servicios por tipo de jornada" description='Columna "Servicio" — Vuelta / Día / Medio día'>
+          {data.porServicio.length ? (
+            <RankingBarList items={data.porServicio} />
+          ) : (
+            <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
+          )}
+        </ChartCard>
+        <ChartCard title="Servicios por tipo de vehículo" description='Columna "Tipo de Servicio" — Domicilio / Mensajería / Carry'>
+          {data.porTipoServicio.length ? (
+            <RankingBarList items={data.porTipoServicio} />
+          ) : (
+            <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
+          )}
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        title="Servicios por mes"
+        description="Histórico completo, independiente del filtro de día — filtra por proyecto desde aquí"
+        className="mb-5"
+      >
+        <MesChart mesProyecto={trend.mesProyecto} />
+      </ChartCard>
+
+      <ChartCard
+        title="Tendencia por día"
+        description="Histórico completo, independiente del filtro de día — filtra por mes y proyecto desde aquí"
+      >
+        <DiaTrendChart diaProyecto={trend.diaProyecto} />
+      </ChartCard>
     </div>
   );
 }

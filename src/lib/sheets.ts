@@ -1,5 +1,4 @@
 import { google } from 'googleapis';
-import { unstable_cache } from 'next/cache';
 
 const SHEET_RANGE = 'Datos_Actuales!A:DY';
 
@@ -18,11 +17,15 @@ export type ServiceRow = {
   descCancelacion: string;
   diaSolicitud: number | null;
   anioSolicitud: number | null;
+  mesNumSolicitud: number | null;
   mesSolicitud: string;
   fechaSolicitud: string;
   horaServicio: string;
   fechaCreacion: string;
   horaCreacion: string;
+  jefatura: string;
+  servicio: string;
+  tipoServicio: string;
 };
 
 function getAuth() {
@@ -80,11 +83,15 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     descCancelacion: idx('Descripcion de Cancelacion'),
     diaSolicitud: idx('DÍA SOLICITUD'),
     anioSolicitud: idx('AÑO SOLICITUD'),
+    mesNumSolicitud: idx('MES # SOLICITUD'),
     mesSolicitud: idx('MES SOLICITUD'),
     fechaSolicitud: idx('FECHA SOLICITUD'),
     horaServicio: idx('HORA DE SERVICIO'),
     fechaCreacion: idx('FECHA CREACIÓN'),
     horaCreacion: idx('HORA DE CREACIÓN'),
+    jefatura: idx('JEFATURA'),
+    servicio: idx('Servicio'),
+    tipoServicio: idx('Tipo de Servicio'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
@@ -105,11 +112,15 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       descCancelacion: String(get(row, COLS.descCancelacion) || ''),
       diaSolicitud: Number(get(row, COLS.diaSolicitud)) || null,
       anioSolicitud: Number(get(row, COLS.anioSolicitud)) || null,
+      mesNumSolicitud: Number(get(row, COLS.mesNumSolicitud)) || null,
       mesSolicitud: String(get(row, COLS.mesSolicitud) || ''),
       fechaSolicitud: String(get(row, COLS.fechaSolicitud) || ''),
       horaServicio: String(get(row, COLS.horaServicio) || ''),
       fechaCreacion: String(get(row, COLS.fechaCreacion) || ''),
       horaCreacion: String(get(row, COLS.horaCreacion) || ''),
+      jefatura: String(get(row, COLS.jefatura) || '').trim(),
+      servicio: String(get(row, COLS.servicio) || ''),
+      tipoServicio: String(get(row, COLS.tipoServicio) || ''),
     }))
     .filter((r) => r.id);
 
@@ -118,7 +129,15 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
 
 // Se refresca sola cada 90s: cualquiera que abra el panel ve datos frescos
 // sin necesidad de un botón de "actualizar", y sin golpear la API de
-// Sheets en cada carga de página.
-export const getSheetsSnapshot = unstable_cache(fetchSnapshotUncached, ['service-rows'], {
-  revalidate: 90,
-});
+// Sheets en cada carga de página. No se usa unstable_cache (Next Data
+// Cache) porque el dataset completo ya pasa los 2MB que ese cache permite
+// por entrada — un caché simple en memoria del proceso no tiene ese límite.
+let cached: { data: SheetsSnapshot; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 90_000;
+
+export async function getSheetsSnapshot(): Promise<SheetsSnapshot> {
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await fetchSnapshotUncached();
+  cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  return data;
+}

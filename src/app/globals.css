@@ -100,7 +100,11 @@ body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* "none", no translateY(0): cualquier transform no-"none" que quede
+       vigente tras la animación (fill-mode both) convierte este div en el
+       containing block de los descendientes position:fixed — reventaba el
+       posicionamiento del modal ampliado de las gráficas. */
+    transform: none;
   }
 }
 
