@@ -81,6 +81,24 @@ body {
   background-image: var(--gradient-dark);
 }
 
+/* Los <select> nativos solo mostraban el borde + texto, sin afordancia
+   clara de que son clicables — se agrega una flecha visible consistente
+   con la marca en vez de depender del estilo mínimo del navegador. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23f3c94f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 13px;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+
+select:hover {
+  border-color: var(--border-strong);
+}
+
 .panel-card {
   background: var(--surface);
   border: 1px solid var(--border);
