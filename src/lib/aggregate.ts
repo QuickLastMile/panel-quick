@@ -133,14 +133,18 @@ export function buildTrendData(rows: ServiceRow[]): TrendData {
   return { mesProyecto, diaProyecto };
 }
 
-export function buildDashboardData(rows: ServiceRow[]): DashboardData {
+export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
+  // Filtro único a la entrada: "OTRO"/"OTROS"/"NN" son proyectos sin
+  // clasificar, no reales — se excluyen de TODA la página (total, por
+  // estado, por ciudad, por hora, etc.), no solo de la gráfica de proyectos.
+  const rows = allRows.filter((r) => !isSinClasificar(r.proyecto));
+
   const porEstadoMap: Record<string, number> = {};
   rows.forEach((r) => bump(porEstadoMap, normEstado(r.estado)));
 
   const porProyectoMap: Record<string, number> = {};
   const proyectoEstadoMap: Record<string, number> = {};
   rows.forEach((r) => {
-    if (SIN_CLASIFICAR.has(r.proyecto.toUpperCase())) return;
     bump(porProyectoMap, r.proyecto);
     bump(proyectoEstadoMap, `${r.proyecto}|||${normEstado(r.estado)}`);
   });
