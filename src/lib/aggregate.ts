@@ -221,3 +221,40 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     gestorStats,
   };
 }
+
+export type MensajeroStat = {
+  identTrabajador: string;
+  nombreTrabajador: string;
+  total: number;
+  finalizado: number;
+  cancelado: number;
+  enProceso: number;
+};
+
+// Productividad de mensajeros/trabajadores (no gestores) — "productivo" se
+// mide por servicios Finalizado, igual criterio que el % cumplimiento de
+// gestores. Usa Ident. Trabajador como llave (el nombre puede repetirse).
+export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
+  const map: Record<string, MensajeroStat> = {};
+  rows.forEach((r) => {
+    if (!r.identTrabajador) return;
+    if (!map[r.identTrabajador]) {
+      map[r.identTrabajador] = {
+        identTrabajador: r.identTrabajador,
+        nombreTrabajador: r.nombreTrabajador || r.identTrabajador,
+        total: 0,
+        finalizado: 0,
+        cancelado: 0,
+        enProceso: 0,
+      };
+    }
+    const entry = map[r.identTrabajador];
+    if (r.nombreTrabajador) entry.nombreTrabajador = r.nombreTrabajador;
+    entry.total += 1;
+    const e = normEstado(r.estado);
+    if (e === 'Finalizado') entry.finalizado += 1;
+    else if (e === 'Cancelado') entry.cancelado += 1;
+    else entry.enProceso += 1;
+  });
+  return Object.values(map).sort((a, b) => b.finalizado - a.finalizado);
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gauge, ClipboardList, Users, Settings, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Gauge, ClipboardList, Users, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser } from 'lucide-react';
 import { logout } from '@/app/login/actions';
 import type { Role } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/auth';
@@ -12,6 +12,8 @@ const NAV = [
   { href: '/dashboard', label: 'Resumen', icon: Gauge, roles: ['admin', 'supervisor', 'coordinador'] },
   { href: '/dashboard/gestion', label: 'Gestión', icon: ClipboardList, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/gestores', label: 'Seguimiento gestores', icon: Users, roles: ['admin', 'supervisor'] },
+  { href: '/dashboard/mensajeros', label: 'Ranking mensajeros', icon: Trophy, roles: ['admin', 'supervisor'] },
+  { href: '/dashboard/directorio', label: 'Directorio', icon: BookUser, roles: ['admin', 'supervisor'] },
   { href: '/admin/configuracion', label: 'Configuración', icon: Settings, roles: ['admin'] },
 ] as const;
 
