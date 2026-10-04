@@ -75,7 +75,10 @@ export default function DirectorioClient({
         )}
       </div>
 
-      <ChartCard title="Directorio de mensajeros" description={`${filtered.length.toLocaleString('es-CO')} mensajeros`}>
+      <ChartCard
+        title="Directorio de mensajeros"
+        description={`${filtered.length.toLocaleString('es-CO')} registrados — solo vetados, contratados fijos o con alguna novedad`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-xs">
             <thead>

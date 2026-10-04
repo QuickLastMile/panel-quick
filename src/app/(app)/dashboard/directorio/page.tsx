@@ -1,5 +1,5 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { getDirectorio, emptyDirectorioEntry } from '@/lib/directorio';
+import { getDirectorio } from '@/lib/directorio';
 import { isSinClasificar } from '@/lib/aggregate';
 import { formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
@@ -20,15 +20,13 @@ export default async function DirectorioPage() {
     if (r.identTrabajador) seenNames.set(r.identTrabajador, r.nombreTrabajador || seenNames.get(r.identTrabajador) || r.identTrabajador);
   });
 
-  const dirMap = new Map(directorio.map((d) => [d.identTrabajador, d]));
-  const allIds = new Set<string>([...seenNames.keys(), ...dirMap.keys()]);
-
-  const entries = Array.from(allIds)
-    .map((id) => {
-      const existing = dirMap.get(id);
-      if (existing) return { ...existing, nombreTrabajador: existing.nombreTrabajador || seenNames.get(id) || id };
-      return emptyDirectorioEntry(id, seenNames.get(id) || id);
-    })
+  // El directorio NO es un roster de todo mensajero que haya pasado por acá
+  // (con tanta rotación tipo DiDi/Picap, eso sería una lista gigante e
+  // inútil) — solo se listan los que tienen algo que registrar: vetados,
+  // contratados fijos, o con alguna novedad anotada.
+  const entries = directorio
+    .filter((e) => e.vetado || e.contratadoFijo || e.notas.trim() !== '')
+    .map((e) => ({ ...e, nombreTrabajador: e.nombreTrabajador || seenNames.get(e.identTrabajador) || e.identTrabajador }))
     .sort((a, b) => a.nombreTrabajador.localeCompare(b.nombreTrabajador, 'es'));
 
   // Asignaciones activas (no cerradas) — para detectar mensajeros marcados

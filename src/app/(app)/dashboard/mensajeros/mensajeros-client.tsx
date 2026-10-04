@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ShieldCheck, Medal, Award, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ShieldCheck, Medal, Award, ChevronDown, ChevronUp, Ban, BadgeCheck, FileWarning, Flag } from 'lucide-react';
 import type { ServiceRow } from '@/lib/sheets';
 import { buildMensajeroStats, type MensajeroStat } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
+import type { DirectorioEntry } from '@/lib/directorio-types';
+import { emptyDirectorioEntry } from '@/lib/directorio-types';
 import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
+import DirectorioEditModal from '../directorio/directorio-edit-modal';
 
 const EN_PROCESO_COLOR = STATUS_COLOR['Asignado'];
 
@@ -23,13 +26,31 @@ function rankBadge(i: number) {
   return null;
 }
 
-function MensajeroCard({ s, rank }: { s: MensajeroStat; rank: number }) {
+function MensajeroCard({
+  s,
+  rank,
+  dirEntry,
+  canEditDirectorio,
+  onOpenRegistro,
+}: {
+  s: MensajeroStat;
+  rank: number;
+  dirEntry?: DirectorioEntry;
+  canEditDirectorio: boolean;
+  onOpenRegistro: () => void;
+}) {
   const t = tier(s.indiceFidelidad);
   const badge = rankBadge(rank);
   const BadgeIcon = badge?.icon;
+  const hasNovedad = !!dirEntry && dirEntry.notas.trim() !== '' && !dirEntry.vetado;
 
   return (
-    <div className="panel-card flex flex-col gap-3 rounded-xl p-4">
+    <div
+      onClick={canEditDirectorio ? onOpenRegistro : undefined}
+      className={`panel-card flex flex-col gap-3 rounded-xl p-4 ${
+        canEditDirectorio ? 'cursor-pointer transition-colors hover:border-[var(--border-strong)]' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[var(--surface-sunken)] text-xs font-bold text-[var(--text-secondary)]">
@@ -47,6 +68,29 @@ function MensajeroCard({ s, rank }: { s: MensajeroStat; rank: number }) {
           {t.label}
         </span>
       </div>
+
+      {dirEntry && (dirEntry.vetado || dirEntry.contratadoFijo || hasNovedad) && (
+        <div className="flex flex-wrap gap-1.5">
+          {dirEntry.vetado && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400">
+              <Ban size={10} />
+              Vetado{dirEntry.vetadoProyecto ? ` — ${dirEntry.vetadoProyecto}` : ''}
+            </span>
+          )}
+          {dirEntry.contratadoFijo && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-bright)]">
+              <BadgeCheck size={10} />
+              Fijo{dirEntry.contratadoFijoProyecto ? ` — ${dirEntry.contratadoFijoProyecto}` : ''}
+            </span>
+          )}
+          {hasNovedad && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+              <FileWarning size={10} />
+              Novedad
+            </span>
+          )}
+        </div>
+      )}
 
       <div>
         <div className="mb-1 flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
@@ -96,13 +140,31 @@ function MensajeroCard({ s, rank }: { s: MensajeroStat; rank: number }) {
           )}
         </div>
       )}
+
+      {canEditDirectorio && (
+        <p className="flex items-center gap-1 text-[10px] font-semibold text-[var(--text-muted)]">
+          <Flag size={10} />
+          {dirEntry ? 'Ver / editar registro en Directorio' : 'Registrar vetado o novedad'}
+        </p>
+      )}
     </div>
   );
 }
 
-export default function MensajerosClient({ rows }: { rows: ServiceRow[] }) {
+export default function MensajerosClient({
+  rows,
+  directorio,
+  canEditDirectorio,
+}: {
+  rows: ServiceRow[];
+  directorio: DirectorioEntry[];
+  canEditDirectorio: boolean;
+}) {
   const [proyecto, setProyecto] = useState('');
   const [showVolumen, setShowVolumen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<DirectorioEntry | null>(null);
+
+  const dirMap = useMemo(() => new Map(directorio.map((d) => [d.identTrabajador, d])), [directorio]);
 
   const proyectos = useMemo(() => {
     const set = new Set<string>();
@@ -141,16 +203,6 @@ export default function MensajerosClient({ rows }: { rows: ServiceRow[] }) {
         )}
       </div>
 
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--accent-soft)] p-3.5 text-xs text-[var(--accent-bright)]">
-        <Info size={15} className="mt-0.5 flex-none" />
-        <p>
-          Esta operación trabaja con personal colaborativo (modelo tipo DiDi/Picap) — hay rotación alta y entra gente nueva seguido. Por
-          eso el ranking no es solo quién hizo más: el <b>índice de fidelidad</b> combina constancia (días distintos trabajando) con
-          cumplimiento (finalizados vs. cancelados), para resaltar a quienes de verdad son fieles y juiciosos, no solo a quien tuvo un
-          pico de volumen.
-        </p>
-      </div>
-
       {top && (
         <div className="panel-card mb-5 flex items-center gap-4 rounded-xl border-[var(--accent)] p-5">
           <span className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-gradient-gold text-[#141008] shadow-[0_0_18px_rgba(214,164,25,0.25)]">
@@ -177,7 +229,16 @@ export default function MensajerosClient({ rows }: { rows: ServiceRow[] }) {
       {stats.length ? (
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {stats.slice(0, 12).map((s, i) => (
-            <MensajeroCard key={s.identTrabajador} s={s} rank={i} />
+            <MensajeroCard
+              key={s.identTrabajador}
+              s={s}
+              rank={i}
+              dirEntry={dirMap.get(s.identTrabajador)}
+              canEditDirectorio={canEditDirectorio}
+              onOpenRegistro={() =>
+                setEditingEntry(dirMap.get(s.identTrabajador) || emptyDirectorioEntry(s.identTrabajador, s.nombreTrabajador))
+              }
+            />
           ))}
         </div>
       ) : (
@@ -253,6 +314,8 @@ export default function MensajerosClient({ rows }: { rows: ServiceRow[] }) {
           </ChartCard>
         </>
       )}
+
+      {canEditDirectorio && <DirectorioEditModal entry={editingEntry} onClose={() => setEditingEntry(null)} />}
     </div>
   );
 }
