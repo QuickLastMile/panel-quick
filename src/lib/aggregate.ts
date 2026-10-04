@@ -229,13 +229,35 @@ export type MensajeroStat = {
   finalizado: number;
   cancelado: number;
   enProceso: number;
+  // Días distintos (por fecha de solicitud) en los que este mensajero tuvo
+  // al menos un servicio — proxy de constancia/antigüedad real en la
+  // plataforma, no solo volumen. Relevante porque esta operación es tipo
+  // DiDi/Picap: hay mucha rotación, y "quién hizo más" no es lo mismo que
+  // "quién ha sido constante y confiable".
+  diasActivos: number;
+  proyectos: string[];
+  // finalizado / (finalizado + cancelado) — 0.5 (neutral) si aún no tiene
+  // ningún servicio resuelto, para no castigar a alguien recién llegado.
+  tasaCumplimiento: number;
+  // 0-100: 50% constancia (días activos relativo al más constante del
+  // grupo filtrado) + 50% cumplimiento. Es la métrica de "fiel y juicioso".
+  indiceFidelidad: number;
 };
 
-// Productividad de mensajeros/trabajadores (no gestores) — "productivo" se
-// mide por servicios Finalizado, igual criterio que el % cumplimiento de
-// gestores. Usa Ident. Trabajador como llave (el nombre puede repetirse).
+// Productividad Y fidelidad de mensajeros/trabajadores (no gestores). Usa
+// Ident. Trabajador como llave (el nombre puede repetirse).
 export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
-  const map: Record<string, MensajeroStat> = {};
+  type Acc = {
+    identTrabajador: string;
+    nombreTrabajador: string;
+    total: number;
+    finalizado: number;
+    cancelado: number;
+    enProceso: number;
+    dias: Set<string>;
+    proyectos: Set<string>;
+  };
+  const map: Record<string, Acc> = {};
   rows.forEach((r) => {
     if (!r.identTrabajador) return;
     if (!map[r.identTrabajador]) {
@@ -246,6 +268,8 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
         finalizado: 0,
         cancelado: 0,
         enProceso: 0,
+        dias: new Set(),
+        proyectos: new Set(),
       };
     }
     const entry = map[r.identTrabajador];
@@ -255,6 +279,30 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
     if (e === 'Finalizado') entry.finalizado += 1;
     else if (e === 'Cancelado') entry.cancelado += 1;
     else entry.enProceso += 1;
+    if (r.fechaSolicitud) entry.dias.add(r.fechaSolicitud);
+    if (r.proyecto) entry.proyectos.add(r.proyecto);
   });
-  return Object.values(map).sort((a, b) => b.finalizado - a.finalizado);
+
+  const accs = Object.values(map);
+  const maxDias = Math.max(...accs.map((a) => a.dias.size), 1);
+
+  return accs
+    .map((a) => {
+      const resueltos = a.finalizado + a.cancelado;
+      const tasaCumplimiento = resueltos > 0 ? a.finalizado / resueltos : 0.5;
+      const tenureScore = a.dias.size / maxDias;
+      return {
+        identTrabajador: a.identTrabajador,
+        nombreTrabajador: a.nombreTrabajador,
+        total: a.total,
+        finalizado: a.finalizado,
+        cancelado: a.cancelado,
+        enProceso: a.enProceso,
+        diasActivos: a.dias.size,
+        proyectos: Array.from(a.proyectos).sort((x, y) => x.localeCompare(y, 'es')),
+        tasaCumplimiento,
+        indiceFidelidad: Math.round(100 * (0.5 * tenureScore + 0.5 * tasaCumplimiento)),
+      };
+    })
+    .sort((a, b) => b.indiceFidelidad - a.indiceFidelidad || b.finalizado - a.finalizado);
 }

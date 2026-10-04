@@ -14,7 +14,6 @@ const NAV = [
   { href: '/dashboard/gestores', label: 'Seguimiento gestores', icon: Users, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/mensajeros', label: 'Ranking mensajeros', icon: Trophy, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/directorio', label: 'Directorio', icon: BookUser, roles: ['admin', 'supervisor'] },
-  { href: '/admin/configuracion', label: 'Configuración', icon: Settings, roles: ['admin'] },
 ] as const;
 
 const COLLAPSE_KEY = 'quick-sidebar-collapsed';
@@ -102,10 +101,38 @@ export default function Sidebar({ role, nombre, email }: { role: Role; nombre: s
 
       <div className={`border-t border-[var(--border)] px-4 py-4 ${collapsed ? 'px-2' : ''}`}>
         {!collapsed && (
-          <>
-            <p className="truncate text-sm font-semibold">{nombre || email}</p>
-            <p className="mb-3 truncate text-xs text-[var(--text-muted)]">{ROLE_LABEL[role]}</p>
-          </>
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{nombre || email}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">{ROLE_LABEL[role]}</p>
+            </div>
+            {role === 'admin' && (
+              <Link
+                href="/admin/configuracion"
+                title="Configuración"
+                className={`flex-none rounded-lg border p-1.5 transition-colors ${
+                  pathname.startsWith('/admin/configuracion')
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-bright)]'
+                    : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <Settings size={14} />
+              </Link>
+            )}
+          </div>
+        )}
+        {collapsed && role === 'admin' && (
+          <Link
+            href="/admin/configuracion"
+            title="Configuración"
+            className={`mb-2 flex w-full items-center justify-center rounded-lg border p-2 transition-colors ${
+              pathname.startsWith('/admin/configuracion')
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-bright)]'
+                : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            <Settings size={14} />
+          </Link>
         )}
         <form action={logout}>
           <button

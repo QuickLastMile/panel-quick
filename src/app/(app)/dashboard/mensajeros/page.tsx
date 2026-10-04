@@ -1,21 +1,14 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { isSinClasificar } from '@/lib/aggregate';
-import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
+import { formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
-import DateFilterBar from '@/components/date-filter';
 import MensajerosClient from './mensajeros-client';
 
-export default async function MensajerosPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function MensajerosPage() {
   await requireRole(['admin', 'supervisor']);
-  const filter = parseDateFilterParams(await searchParams);
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const cleanRows = allRows.filter((r) => !isSinClasificar(r.proyecto));
-  const rows = filterRowsByDate(cleanRows, filter);
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
@@ -23,11 +16,10 @@ export default async function MensajerosPage({
       <PageHeader
         eyebrow="Mensajeros"
         title="Ranking de"
-        accent={`mensajeros — ${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}`}
+        accent="mensajeros — histórico completo"
         asOf={`Última sincronización: ${syncLabel}`}
       />
-      <DateFilterBar filter={filter} />
-      <MensajerosClient rows={rows} />
+      <MensajerosClient rows={cleanRows} />
     </div>
   );
 }
