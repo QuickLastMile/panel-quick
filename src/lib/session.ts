@@ -1,12 +1,17 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { SESSION_COOKIE, verifySessionToken, type Role } from './auth';
+import { SESSION_COOKIE, verifySessionToken, type Role, type SessionData } from './auth';
 
-export async function getSessionRole(): Promise<Role | null> {
+export async function getSession(): Promise<SessionData | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   return verifySessionToken(token);
+}
+
+export async function getSessionRole(): Promise<Role | null> {
+  const session = await getSession();
+  return session?.role ?? null;
 }
 
 // Segunda capa de control de acceso (además del proxy): cada página

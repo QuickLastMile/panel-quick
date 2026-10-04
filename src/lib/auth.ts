@@ -20,6 +20,7 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/directorio',
     '/admin/configuracion',
     '/admin/configuracion/historial',
+    '/admin/configuracion/usuarios',
   ],
   supervisor: ['/dashboard', '/dashboard/gestion', '/dashboard/gestores', '/dashboard/mensajeros', '/dashboard/directorio'],
   coordinador: ['/dashboard'],
@@ -34,33 +35,22 @@ function getSecretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export function checkCredentials(username: string, password: string): Role | null {
-  const normalized = username.trim().toLowerCase();
-  const map: Record<string, { password: string | undefined; role: Role }> = {
-    admin: { password: process.env.ADMIN_PASSWORD, role: 'admin' },
-    supervisor: { password: process.env.SUPERVISOR_PASSWORD, role: 'supervisor' },
-    coordinador: { password: process.env.COORDINADOR_PASSWORD, role: 'coordinador' },
-  };
-  const entry = map[normalized];
-  if (!entry || !entry.password) return null;
-  if (password !== entry.password) return null;
-  return entry.role;
-}
+export type SessionData = { role: Role; email: string; nombre: string };
 
-export async function createSessionToken(role: Role): Promise<string> {
-  return new SignJWT({ role })
+export async function createSessionToken(data: SessionData): Promise<string> {
+  return new SignJWT({ role: data.role, email: data.email, nombre: data.nombre })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(getSecretKey());
 }
 
-export async function verifySessionToken(token: string): Promise<Role | null> {
+export async function verifySessionToken(token: string): Promise<SessionData | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
     const role = payload.role;
-    if (role === 'admin' || role === 'supervisor' || role === 'coordinador') return role;
-    return null;
+    if (role !== 'admin' && role !== 'supervisor' && role !== 'coordinador') return null;
+    return { role, email: String(payload.email || ''), nombre: String(payload.nombre || '') };
   } catch {
     return null;
   }

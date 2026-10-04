@@ -1,3 +1,4 @@
+import { MapPin } from 'lucide-react';
 import LoginForm from './login-form';
 
 export default async function LoginPage({
@@ -17,7 +18,10 @@ export default async function LoginPage({
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-gold text-lg font-black text-[#141008] shadow-[0_0_22px_rgba(214,164,25,0.3)]">
             Q
           </span>
-          <div className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)]">QUICK</div>
+          <div className="mt-1 flex items-center text-3xl font-black tracking-tight text-[var(--text)]">
+            <span>G</span>
+            <MapPin size={26} strokeWidth={2.5} className="text-[var(--accent-bright)]" fill="var(--accent-soft)" />
+          </div>
           <p className="text-sm text-[var(--text-muted)]">Centro de Operaciones</p>
         </div>
         <LoginForm next={next ?? '/dashboard'} />

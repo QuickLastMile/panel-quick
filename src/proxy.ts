@@ -8,7 +8,8 @@ import { SESSION_COOKIE, verifySessionToken, ROLE_ALLOWED_PATHS } from '@/lib/au
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const role = token ? await verifySessionToken(token) : null;
+  const session = token ? await verifySessionToken(token) : null;
+  const role = session?.role ?? null;
 
   if (pathname === '/login') {
     if (role) return NextResponse.redirect(new URL('/dashboard', request.url));

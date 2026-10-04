@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gauge, ClipboardList, Users, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser } from 'lucide-react';
+import { Gauge, ClipboardList, Users, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser, MapPin } from 'lucide-react';
 import { logout } from '@/app/login/actions';
 import type { Role } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/auth';
@@ -19,7 +19,7 @@ const NAV = [
 
 const COLLAPSE_KEY = 'quick-sidebar-collapsed';
 
-export default function Sidebar({ role }: { role: Role }) {
+export default function Sidebar({ role, nombre, email }: { role: Role; nombre: string; email: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -49,7 +49,10 @@ export default function Sidebar({ role }: { role: Role }) {
         </span>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold tracking-tight">QUICK</p>
+            <p className="flex items-center text-lg font-black tracking-tight">
+              <span>G</span>
+              <MapPin size={15} strokeWidth={2.5} className="text-[var(--accent-bright)]" fill="var(--accent-soft)" />
+            </p>
             <p className="truncate text-[11px] leading-tight text-[var(--text-muted)]">Centro de Operaciones</p>
           </div>
         )}
@@ -100,8 +103,8 @@ export default function Sidebar({ role }: { role: Role }) {
       <div className={`border-t border-[var(--border)] px-4 py-4 ${collapsed ? 'px-2' : ''}`}>
         {!collapsed && (
           <>
-            <p className="truncate text-sm font-semibold">{ROLE_LABEL[role]}</p>
-            <p className="mb-3 text-xs text-[var(--text-muted)]">Sesión activa</p>
+            <p className="truncate text-sm font-semibold">{nombre || email}</p>
+            <p className="mb-3 truncate text-xs text-[var(--text-muted)]">{ROLE_LABEL[role]}</p>
           </>
         )}
         <form action={logout}>
