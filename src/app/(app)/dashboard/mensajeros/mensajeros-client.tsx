@@ -144,7 +144,7 @@ function MensajeroCard({
       {canEditDirectorio && (
         <p className="flex items-center gap-1 text-[10px] font-semibold text-[var(--text-muted)]">
           <Flag size={10} />
-          {dirEntry ? 'Ver / editar registro en Directorio' : 'Registrar vetado o novedad'}
+          {dirEntry ? 'Ver / editar registro en Novedades' : 'Registrar vetado o novedad'}
         </p>
       )}
     </div>

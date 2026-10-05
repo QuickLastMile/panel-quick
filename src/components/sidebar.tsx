@@ -13,7 +13,7 @@ const NAV = [
   { href: '/dashboard/gestion', label: 'Gestión', icon: ClipboardList, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/gestores', label: 'Seguimiento gestores', icon: Users, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/mensajeros', label: 'Ranking mensajeros', icon: Trophy, roles: ['admin', 'supervisor'] },
-  { href: '/dashboard/directorio', label: 'Directorio', icon: BookUser, roles: ['admin', 'supervisor'] },
+  { href: '/dashboard/directorio', label: 'Novedades', icon: BookUser, roles: ['admin', 'supervisor'] },
 ] as const;
 
 const COLLAPSE_KEY = 'quick-sidebar-collapsed';

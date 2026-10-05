@@ -44,7 +44,8 @@ export type DashboardData = {
   proyectoEstado: { proyecto: string; estado: string; count: number }[];
   porCiudad: { key: string; count: number }[];
   ciudadEstado: { ciudad: string; estado: string; count: number }[];
-  horaCiudad: { ciudad: string; hora: number; fuente: 'servicio' | 'creacion'; count: number }[];
+  ciudadProyectoEstado: { ciudad: string; proyecto: string; estado: string; count: number }[];
+  horaCiudad: { ciudad: string; proyecto: string; hora: number; fuente: 'servicio' | 'creacion'; count: number }[];
   porServicio: { key: string; count: number }[];
   porTipoServicio: { key: string; count: number }[];
   gestorStats: GestorStat[];
@@ -151,17 +152,21 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
 
   const porCiudadMap: Record<string, number> = {};
   const ciudadEstadoMap: Record<string, number> = {};
+  const ciudadProyectoEstadoMap: Record<string, number> = {};
   rows.forEach((r) => {
     bump(porCiudadMap, r.ciudad);
     bump(ciudadEstadoMap, `${r.ciudad}|||${normEstado(r.estado)}`);
+    bump(ciudadProyectoEstadoMap, `${r.ciudad}|||${r.proyecto}|||${normEstado(r.estado)}`);
   });
 
+  // Incluye el proyecto en la llave para poder filtrar/desglosar por
+  // proyecto en el cliente (validar qué proyecto está creando en cada hora).
   const horaCiudadMap: Record<string, number> = {};
   rows.forEach((r) => {
     const hServicio = parseHour(r.horaServicio);
-    if (hServicio !== null) bump(horaCiudadMap, `${r.ciudad}|||${hServicio}|||servicio`);
+    if (hServicio !== null) bump(horaCiudadMap, `${r.ciudad}|||${r.proyecto}|||${hServicio}|||servicio`);
     const hCreacion = parseHour(r.horaCreacion);
-    if (hCreacion !== null) bump(horaCiudadMap, `${r.ciudad}|||${hCreacion}|||creacion`);
+    if (hCreacion !== null) bump(horaCiudadMap, `${r.ciudad}|||${r.proyecto}|||${hCreacion}|||creacion`);
   });
 
   const porServicioMap: Record<string, number> = {};
@@ -212,9 +217,13 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
       const [ciudad, estado] = k.split('|||');
       return { ciudad, estado, count };
     }),
+    ciudadProyectoEstado: Object.entries(ciudadProyectoEstadoMap).map(([k, count]) => {
+      const [ciudad, proyecto, estado] = k.split('|||');
+      return { ciudad, proyecto, estado, count };
+    }),
     horaCiudad: Object.entries(horaCiudadMap).map(([k, count]) => {
-      const [ciudad, hora, fuente] = k.split('|||');
-      return { ciudad, hora: Number(hora), fuente: fuente as 'servicio' | 'creacion', count };
+      const [ciudad, proyecto, hora, fuente] = k.split('|||');
+      return { ciudad, proyecto, hora: Number(hora), fuente: fuente as 'servicio' | 'creacion', count };
     }),
     porServicio: toPairs(porServicioMap).sort((a, b) => b.count - a.count),
     porTipoServicio: toPairs(porTipoServicioMap).sort((a, b) => b.count - a.count),

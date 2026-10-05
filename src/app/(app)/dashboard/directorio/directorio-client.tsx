@@ -70,13 +70,13 @@ export default function DirectorioClient({
             className="flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
           >
             <Plus size={14} />
-            Agregar mensajero
+            Agregar novedad
           </button>
         )}
       </div>
 
       <ChartCard
-        title="Directorio de mensajeros"
+        title="Novedades de mensajeros"
         description={`${filtered.length.toLocaleString('es-CO')} registrados — solo vetados, contratados fijos o con alguna novedad`}
       >
         <div className="overflow-x-auto">

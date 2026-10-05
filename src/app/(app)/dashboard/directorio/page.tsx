@@ -39,9 +39,9 @@ export default async function DirectorioPage() {
     <div>
       <PageHeader
         eyebrow="Mensajeros"
-        title="Directorio de"
-        accent="trabajadores"
-        asOf={`Última sincronización: ${syncLabel} · ${entries.length.toLocaleString('es-CO')} mensajeros`}
+        title="Novedades de"
+        accent="mensajeros"
+        asOf={`Última sincronización: ${syncLabel} · ${entries.length.toLocaleString('es-CO')} registrados`}
       />
       <DirectorioClient entries={entries} activeAssignments={activeAssignments} canEdit={role === 'admin'} />
     </div>

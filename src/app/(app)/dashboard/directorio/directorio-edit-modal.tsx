@@ -69,7 +69,7 @@ export default function DirectorioEditModal({ entry, onClose }: { entry: Directo
       <div className="fixed inset-0 z-40 animate-fade-in-up bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-2xl md:inset-x-10 md:inset-y-10 md:mx-auto md:max-w-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border)] p-5">
-          <h2 className="text-sm font-bold text-[var(--text)]">{isNew ? 'Agregar mensajero' : `Editar — ${entry.nombreTrabajador}`}</h2>
+          <h2 className="text-sm font-bold text-[var(--text)]">{isNew ? 'Agregar novedad' : `Editar — ${entry.nombreTrabajador}`}</h2>
           <button
             onClick={onClose}
             className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--accent-bright)]"
@@ -167,7 +167,7 @@ export default function DirectorioEditModal({ entry, onClose }: { entry: Directo
               Contratado fijo en una operación
             </label>
             <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-              Si se marca, el Directorio avisará si este mensajero aparece activo en cualquier otro proyecto.
+              Si se marca, Novedades avisará si este mensajero aparece activo en cualquier otro proyecto.
             </p>
             {form.contratadoFijo && (
               <div className="mt-3">

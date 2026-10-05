@@ -11,6 +11,7 @@ import ChartCard from '@/components/charts/chart-card';
 import StackedBarList from '@/components/charts/stacked-bar-list';
 import RankingBarList from '@/components/charts/ranking-bar-list';
 import FranjaChart from '@/components/charts/franja-chart';
+import CiudadChart from '@/components/charts/ciudad-chart';
 import MesChart from '@/components/charts/mes-chart';
 import DiaTrendChart from '@/components/charts/dia-trend-chart';
 
@@ -85,18 +86,22 @@ export default async function ResumenPage({
 
       <ChartCard
         title="Servicios por franja horaria"
-        description="Tendencia por hora del día — servicio o solicitud. Solo muestra el rango de horas con datos."
+        description={`Usa el filtro de fecha de arriba (${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}) — solo muestra el rango de horas con datos.`}
         className="mb-5"
       >
-        <FranjaChart horaCiudad={data.horaCiudad} ciudades={data.porCiudad.map((c) => c.key)} />
+        <FranjaChart
+          horaCiudad={data.horaCiudad}
+          ciudades={data.porCiudad.map((c) => c.key)}
+          proyectos={data.porProyecto.map((p) => p.key)}
+        />
       </ChartCard>
 
-      <ChartCard title="Servicios por ciudad" description="Top 14 ciudades — desglose por estado" className="mb-5">
-        {data.porCiudad.length ? (
-          <StackedBarList totals={data.porCiudad} byKey={data.ciudadEstado.map((c) => ({ proyecto: c.ciudad, estado: c.estado, count: c.count }))} />
-        ) : (
-          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
-        )}
+      <ChartCard
+        title="Servicios por ciudad"
+        description={`Top 14 ciudades — desglose por estado. Usa el filtro de fecha de arriba (${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}).`}
+        className="mb-5"
+      >
+        <CiudadChart ciudadProyectoEstado={data.ciudadProyectoEstado} proyectos={data.porProyecto.map((p) => p.key)} />
       </ChartCard>
 
       <div className="mb-5 grid gap-5 md:grid-cols-2">

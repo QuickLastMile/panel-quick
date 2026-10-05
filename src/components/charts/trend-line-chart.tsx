@@ -9,11 +9,15 @@ export default function TrendLineChart({
   height = 240,
   valueFormatter = (v: number) => v.toLocaleString('es-CO'),
   emptyMessage = 'Sin datos para este filtro.',
+  extraLines,
 }: {
   points: { label: string; value: number }[];
   height?: number;
   valueFormatter?: (v: number) => string;
   emptyMessage?: string;
+  // Líneas extra para el tooltip (ej. desglose por proyecto a esa hora) —
+  // se calculan solo al pasar el mouse, no en cada render.
+  extraLines?: (index: number) => string[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -45,7 +49,9 @@ export default function TrendLineChart({
     const fraction = (e.clientX - rect.left) / rect.width;
     const idx = Math.min(n - 1, Math.max(0, Math.round(fraction * (n - 1))));
     setHoverIdx(idx);
-    show(e, [points[idx].label, valueFormatter(points[idx].value)]);
+    const lines = [points[idx].label, valueFormatter(points[idx].value)];
+    if (extraLines) lines.push(...extraLines(idx));
+    show(e, lines);
   }
 
   const labelStride = n > 16 ? Math.ceil(n / 16) : 1;

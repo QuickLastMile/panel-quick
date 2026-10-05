@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
 import type { ServiceRow } from '@/lib/sheets';
 import { normEstado } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import { bogotaToday, daysBetween, parseFechaSolicitud, type SimpleDate } from '@/lib/date-filter';
 import StatusPill from './status-pill';
 import TrendLineChart from './charts/trend-line-chart';
+import ServiceDetailPanel from './service-detail-panel';
 
 const TABS = ['General', 'Gestión', 'Seguimiento'] as const;
 type Tab = (typeof TABS)[number];
@@ -23,6 +24,90 @@ function addDays(d: SimpleDate, delta: number): SimpleDate {
 
 function sameDay(f: SimpleDate | null, d: SimpleDate): boolean {
   return !!f && f.year === d.year && f.month === d.month && f.day === d.day;
+}
+
+function DayNav({ day, today, onChange }: { day: SimpleDate; today: SimpleDate; onChange: (next: SimpleDate) => void }) {
+  const dayValue = `${day.year}-${String(day.month).padStart(2, '0')}-${String(day.day).padStart(2, '0')}`;
+  return (
+    <div className="panel-card flex flex-wrap items-center gap-2 rounded-xl p-3">
+      <button
+        onClick={() => onChange(addDays(day, -1))}
+        className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+        aria-label="Día anterior"
+      >
+        <ChevronLeft size={15} />
+      </button>
+      <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)]">
+        <CalendarDays size={14} className="text-[var(--accent-bright)]" />
+        <input
+          type="date"
+          value={dayValue}
+          onChange={(e) => {
+            const [y, m, d] = e.target.value.split('-').map(Number);
+            if (y && m && d) onChange({ year: y, month: m, day: d });
+          }}
+          className="bg-transparent outline-none [color-scheme:dark]"
+        />
+      </label>
+      <button
+        onClick={() => onChange(addDays(day, 1))}
+        className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
+        aria-label="Día siguiente"
+      >
+        <ChevronRight size={15} />
+      </button>
+      {!sameDay(today, day) && (
+        <button
+          onClick={() => onChange(today)}
+          className="rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--accent-bright)] hover:bg-[var(--accent-soft)]/80"
+        >
+          Volver a hoy
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RowsTable({ rows, onSelect }: { rows: ServiceRow[]; onSelect: (row: ServiceRow) => void }) {
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm text-[var(--text-muted)]">Sin resultados.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+      <table className="w-full min-w-[720px] border-collapse text-xs">
+        <thead>
+          <tr>
+            {['ID servicio', 'Gestor', 'Proyecto', 'Estado', 'Ciudad', 'Fecha solicitud'].map((h) => (
+              <th
+                key={h}
+                className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr
+              key={r.id}
+              onClick={() => onSelect(r)}
+              className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]"
+            >
+              <td className="whitespace-nowrap px-3 py-2 font-semibold text-[var(--text)]">{r.id}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.gestor}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.proyecto}</td>
+              <td className="whitespace-nowrap px-3 py-2">
+                <StatusPill status={r.estado} />
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.ciudad}</td>
+              <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.fechaSolicitud}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function SeguimientoTable({ rows }: { rows: { row: ServiceRow; diff: number }[] }) {
@@ -81,6 +166,8 @@ export default function GestorDetailPanel({
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<Tab>('General');
   const [day, setDay] = useState<SimpleDate>(defaultDay);
+  const [search, setSearch] = useState('');
+  const [selectedRow, setSelectedRow] = useState<ServiceRow | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -88,6 +175,7 @@ export default function GestorDetailPanel({
     if (gestor) {
       setTab('General');
       setDay(defaultDay);
+      setSearch('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gestor]);
@@ -113,7 +201,19 @@ export default function GestorDetailPanel({
   const gestorRows = useMemo(() => (gestor ? allRows.filter((r) => r.gestor === gestor) : []), [allRows, gestor]);
   const cargo = gestorRows[0]?.cargoGestor || '';
 
-  const activos = useMemo(() => gestorRows.filter((r) => !TERMINAL.has(normEstado(r.estado))), [gestorRows]);
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return allRows
+      .filter(
+        (r) =>
+          r.id.toLowerCase().includes(q) ||
+          r.identTrabajador.toLowerCase().includes(q) ||
+          r.nombreTrabajador.toLowerCase().includes(q) ||
+          r.gestor.toLowerCase().includes(q)
+      )
+      .slice(0, 30);
+  }, [allRows, search]);
 
   const dayRows = useMemo(
     () => gestorRows.filter((r) => sameDay(parseFechaSolicitud(r.fechaSolicitud), day)),
@@ -257,42 +357,34 @@ export default function GestorDetailPanel({
 
         <div className="flex-1 overflow-auto p-5">
           {tab === 'General' && (
-            <div>
-              <p className="mb-3 text-xs text-[var(--text-muted)]">
-                Servicios que este gestor tiene activos ahora mismo (no finalizados ni cancelados) — {activos.length.toLocaleString('es-CO')} en
-                total.
-              </p>
-              {activos.length === 0 ? (
-                <p className="py-10 text-center text-sm text-[var(--text-muted)]">Sin servicios activos en este momento.</p>
+            <div className="space-y-4">
+              <label className="relative block">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por ID de servicio, cédula, nombre de mensajero o agilizador…"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] py-2 pl-9 pr-3 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+                />
+              </label>
+
+              {search.trim() ? (
+                <div>
+                  <p className="mb-3 text-xs text-[var(--text-muted)]">
+                    {searchResults.length} resultado{searchResults.length === 1 ? '' : 's'}
+                    {searchResults.length === 30 ? ' (mostrando los primeros 30 — afina la búsqueda)' : ''} — busca en todo el histórico,
+                    no solo en este gestor.
+                  </p>
+                  <RowsTable rows={searchResults} onSelect={setSelectedRow} />
+                </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-                  <table className="w-full min-w-[640px] border-collapse text-xs">
-                    <thead>
-                      <tr>
-                        {['ID servicio', 'Proyecto', 'Estado', 'Ciudad', 'Fecha solicitud'].map((h) => (
-                          <th
-                            key={h}
-                            className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]"
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activos.map((r) => (
-                        <tr key={r.id} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
-                          <td className="whitespace-nowrap px-3 py-2 font-semibold text-[var(--text)]">{r.id}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.proyecto}</td>
-                          <td className="whitespace-nowrap px-3 py-2">
-                            <StatusPill status={r.estado} />
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.ciudad}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{r.fechaSolicitud}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <DayNav day={day} today={today} onChange={setDay} />
+                  <p className="my-3 text-xs text-[var(--text-muted)]">
+                    Servicios de este gestor solicitados el {dayValue.split('-').reverse().join('/')} — todos los estados (
+                    {dayRows.length.toLocaleString('es-CO')}).
+                  </p>
+                  <RowsTable rows={dayRows} onSelect={setSelectedRow} />
                 </div>
               )}
             </div>
@@ -300,42 +392,7 @@ export default function GestorDetailPanel({
 
           {tab === 'Gestión' && (
             <div className="space-y-5">
-              <div className="panel-card flex flex-wrap items-center gap-2 rounded-xl p-3">
-                <button
-                  onClick={() => setDay((d) => addDays(d, -1))}
-                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-                  aria-label="Día anterior"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)]">
-                  <CalendarDays size={14} className="text-[var(--accent-bright)]" />
-                  <input
-                    type="date"
-                    value={dayValue}
-                    onChange={(e) => {
-                      const [y, m, d] = e.target.value.split('-').map(Number);
-                      if (y && m && d) setDay({ year: y, month: m, day: d });
-                    }}
-                    className="bg-transparent outline-none [color-scheme:dark]"
-                  />
-                </label>
-                <button
-                  onClick={() => setDay((d) => addDays(d, 1))}
-                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
-                  aria-label="Día siguiente"
-                >
-                  <ChevronRight size={15} />
-                </button>
-                {!sameDay(today, day) && (
-                  <button
-                    onClick={() => setDay(today)}
-                    className="rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--accent-bright)] hover:bg-[var(--accent-soft)]/80"
-                  >
-                    Volver a hoy
-                  </button>
-                )}
-              </div>
+              <DayNav day={day} today={today} onChange={setDay} />
 
               <div>
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--accent-bright)]">
@@ -475,6 +532,7 @@ export default function GestorDetailPanel({
           )}
         </div>
       </div>
+      <ServiceDetailPanel row={selectedRow} onClose={() => setSelectedRow(null)} />
     </>,
     document.body
   );
