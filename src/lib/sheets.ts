@@ -163,7 +163,11 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
 // Cache) porque el dataset completo ya pasa los 2MB que ese cache permite
 // por entrada — un caché simple en memoria del proceso no tiene ese límite.
 let cached: { data: SheetsSnapshot; expiresAt: number } | null = null;
-const CACHE_TTL_MS = 90_000;
+// La automatización sincroniza cada 30 min — no hay razón para releer el
+// Sheet completo (28k+ filas, columnas A:DY) más seguido que esto. Subido
+// de 90s: cada cambio de pestaña que no reutiliza la instancia serverless
+// de Vercel paga esta misma lectura pesada otra vez.
+const CACHE_TTL_MS = 180_000;
 
 export async function getSheetsSnapshot(): Promise<SheetsSnapshot> {
   if (cached && cached.expiresAt > Date.now()) return cached.data;

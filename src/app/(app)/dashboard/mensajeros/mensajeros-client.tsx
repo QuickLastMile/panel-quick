@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { ShieldCheck, Medal, Award, ChevronDown, ChevronUp, Ban, BadgeCheck, FileWarning, Flag } from 'lucide-react';
-import type { ServiceRow } from '@/lib/sheets';
-import { buildMensajeroStats, type MensajeroStat } from '@/lib/aggregate';
+import type { MensajeroStat } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import type { DirectorioEntry } from '@/lib/directorio-types';
 import { emptyDirectorioEntry } from '@/lib/directorio-types';
@@ -152,31 +152,33 @@ function MensajeroCard({
 }
 
 export default function MensajerosClient({
-  rows,
+  stats,
+  proyectos,
+  proyectoParam,
   directorio,
   canEditDirectorio,
 }: {
-  rows: ServiceRow[];
+  stats: MensajeroStat[];
+  proyectos: string[];
+  proyectoParam: string;
   directorio: DirectorioEntry[];
   canEditDirectorio: boolean;
 }) {
-  const [proyecto, setProyecto] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [showVolumen, setShowVolumen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DirectorioEntry | null>(null);
 
   const dirMap = useMemo(() => new Map(directorio.map((d) => [d.identTrabajador, d])), [directorio]);
-
-  const proyectos = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((r) => {
-      if (r.proyecto) set.add(r.proyecto);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [rows]);
-
-  const filteredRows = useMemo(() => (proyecto ? rows.filter((r) => r.proyecto === proyecto) : rows), [rows, proyecto]);
-  const stats = useMemo(() => buildMensajeroStats(filteredRows), [filteredRows]);
   const top = stats[0];
+
+  function setProyecto(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set('proyecto', value);
+    else params.delete('proyecto');
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   return (
     <div>
@@ -184,7 +186,7 @@ export default function MensajerosClient({
         <label className="flex flex-col gap-0.5">
           <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Proyecto</span>
           <select
-            value={proyecto}
+            value={proyectoParam}
             onChange={(e) => setProyecto(e.target.value)}
             className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
           >
@@ -196,7 +198,7 @@ export default function MensajerosClient({
             ))}
           </select>
         </label>
-        {proyecto && (
+        {proyectoParam && (
           <button onClick={() => setProyecto('')} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
             Limpiar filtro
           </button>
@@ -210,7 +212,7 @@ export default function MensajerosClient({
           </span>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--accent-bright)]">
-              {proyecto ? `Más fiel en ${proyecto}` : 'Más fiel y juicioso — todos los proyectos'}
+              {proyectoParam ? `Más fiel en ${proyectoParam}` : 'Más fiel y juicioso — todos los proyectos'}
             </p>
             <p className="text-lg font-bold text-[var(--text)]">{top.nombreTrabajador}</p>
             <p className="text-xs text-[var(--text-muted)]">

@@ -1,6 +1,6 @@
 import { Package, Clock, UserCheck, Truck, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData, buildTrendData, listJefaturas, filterRowsByJefatura } from '@/lib/aggregate';
+import { buildDashboardData, buildTrendData, listJefaturas, filterRowsByJefatura, findDobleAsignacion } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import PageHeader from '@/components/page-header';
@@ -14,6 +14,7 @@ import FranjaChart from '@/components/charts/franja-chart';
 import CiudadChart from '@/components/charts/ciudad-chart';
 import MesChart from '@/components/charts/mes-chart';
 import DiaTrendChart from '@/components/charts/dia-trend-chart';
+import DobleAsignacionAlert from '@/components/doble-asignacion-alert';
 
 const STATUS_ICON = {
   'En Espera': Clock,
@@ -43,6 +44,9 @@ export default async function ResumenPage({
   // acotado por jefatura), a propósito desacoplados del filtro de día/mes de
   // la página — cada uno trae su propio filtro de proyecto/mes.
   const trend = buildTrendData(jefaturaRows);
+  // Independiente del filtro de día — una asignación doble es un problema
+  // sin importar qué día esté mirando la página ahora mismo.
+  const dobleAsignacion = findDobleAsignacion(jefaturaRows);
 
   const byEstado = Object.fromEntries(data.porEstado.map((e) => [e.key, e.count]));
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
@@ -57,6 +61,7 @@ export default async function ResumenPage({
       />
 
       <JefaturaTabs jefaturas={jefaturas} selected={jefaturaParam} />
+      <DobleAsignacionAlert items={dobleAsignacion} />
       <DateFilterBar filter={filter} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">

@@ -1,6 +1,7 @@
 import type { ServiceRow } from './sheets';
 
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
+const TERMINAL = new Set(['Finalizado', 'Cancelado']);
 
 export function isSinClasificar(value: string): boolean {
   return SIN_CLASIFICAR.has(value.toUpperCase());
@@ -314,4 +315,36 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
       };
     })
     .sort((a, b) => b.indiceFidelidad - a.indiceFidelidad || b.finalizado - a.finalizado);
+}
+
+export type DobleAsignacion = {
+  identTrabajador: string;
+  nombreTrabajador: string;
+  fechaSolicitud: string;
+  proyectos: string[];
+  rows: ServiceRow[];
+};
+
+// Un mensajero solo puede hacer un turno al día, salvo que sean "Medio Dia"
+// (ahí sí pueden ser dos). Si el mismo día tiene asignaciones ACTIVAS (no
+// Finalizado/Cancelado) en 2+ proyectos distintos y no todas son Medio Dia,
+// es una asignación doble por error — hay que validarla ya.
+export function findDobleAsignacion(rows: ServiceRow[]): DobleAsignacion[] {
+  const map: Record<string, { identTrabajador: string; nombreTrabajador: string; fechaSolicitud: string; rows: ServiceRow[] }> = {};
+  rows.forEach((r) => {
+    if (!r.identTrabajador || !r.fechaSolicitud) return;
+    if (isSinClasificar(r.proyecto)) return;
+    if (TERMINAL.has(normEstado(r.estado))) return;
+    const key = `${r.identTrabajador}|||${r.fechaSolicitud}`;
+    if (!map[key]) {
+      map[key] = { identTrabajador: r.identTrabajador, nombreTrabajador: r.nombreTrabajador || r.identTrabajador, fechaSolicitud: r.fechaSolicitud, rows: [] };
+    }
+    map[key].rows.push(r);
+  });
+
+  return Object.values(map)
+    .map((g) => ({ ...g, proyectos: Array.from(new Set(g.rows.map((r) => r.proyecto))) }))
+    .filter((g) => g.proyectos.length >= 2)
+    .filter((g) => !g.rows.every((r) => r.servicio === 'Medio Dia'))
+    .sort((a, b) => b.rows.length - a.rows.length);
 }
