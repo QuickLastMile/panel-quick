@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import MultiTrendLineChart from './multi-trend-line-chart';
+import MultiBarTrendChart from './multi-bar-trend-chart';
 import type { MesTipoPoint } from '@/lib/aggregate';
 
 const TIPO_COLOR: Record<string, string> = {
@@ -34,5 +34,5 @@ export default function AsignadorMesChart({ mesTipo }: { mesTipo: MesTipoPoint[]
     });
   }, [mesTipo]);
 
-  return <MultiTrendLineChart series={series} emptyMessage="Aún no hay histórico suficiente para mostrar tendencia mensual." />;
+  return <MultiBarTrendChart series={series} emptyMessage="Aún no hay histórico suficiente para mostrar tendencia mensual." />;
 }
