@@ -1,5 +1,5 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData, isSinClasificar } from '@/lib/aggregate';
+import { buildDashboardData, buildTipoAsignadorTrend, isSinClasificar } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
@@ -17,6 +17,9 @@ export default async function GestoresPage({
   const cleanRows = allRows.filter((r) => !isSinClasificar(r.proyecto));
   const rows = filterRowsByDate(cleanRows, filter);
   const data = buildDashboardData(rows);
+  // Histórico completo (no el filtro de día de la página) — para ver la
+  // tendencia real de quién asigna a través del tiempo.
+  const asignadorTrend = buildTipoAsignadorTrend(cleanRows);
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
@@ -31,6 +34,7 @@ export default async function GestoresPage({
       <GestoresClient
         gestorStats={data.gestorStats}
         porTipoAsignador={data.porTipoAsignador}
+        asignadorTrend={asignadorTrend}
         allRows={cleanRows}
         defaultDay={{ year: filter.year, month: filter.month, day: filter.day }}
       />

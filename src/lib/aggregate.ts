@@ -136,6 +136,53 @@ export function buildTrendData(rows: ServiceRow[]): TrendData {
   return { mesProyecto, diaProyecto };
 }
 
+export type MesTipoPoint = { mes: string; mesLabel: string; tipo: string; count: number };
+export type DiaTipoPoint = { fecha: string; fechaLabel: string; mes: string; mesLabel: string; tipo: string; count: number };
+
+export type TipoAsignadorTrend = {
+  mesTipo: MesTipoPoint[];
+  diaTipo: DiaTipoPoint[];
+};
+
+// Mismo patrón que buildTrendData: histórico completo, independiente del
+// filtro de día de la página — para ver la tendencia real de quién asigna
+// (agilizador vs. administrativo) a través del tiempo.
+export function buildTipoAsignadorTrend(rows: ServiceRow[]): TipoAsignadorTrend {
+  const mesMap: Record<string, { mesLabel: string; tipo: string; count: number }> = {};
+  const diaMap: Record<string, { mesLabel: string; mes: string; tipo: string; count: number }> = {};
+
+  rows.forEach((r) => {
+    if (SIN_CLASIFICAR.has(r.proyecto.toUpperCase())) return;
+    if (!r.tipoAsignador || !r.anioSolicitud || !r.mesNumSolicitud) return;
+    const mesKey = `${r.anioSolicitud}-${pad2(r.mesNumSolicitud)}`;
+    const mesLabel = `${r.mesSolicitud} ${r.anioSolicitud}`;
+    const mk = `${mesKey}|||${r.tipoAsignador}`;
+    if (!mesMap[mk]) mesMap[mk] = { mesLabel, tipo: r.tipoAsignador, count: 0 };
+    mesMap[mk].count += 1;
+
+    if (r.diaSolicitud) {
+      const diaKey = `${mesKey}-${pad2(r.diaSolicitud)}`;
+      const dk = `${diaKey}|||${r.tipoAsignador}`;
+      if (!diaMap[dk]) diaMap[dk] = { mesLabel, mes: mesKey, tipo: r.tipoAsignador, count: 0 };
+      diaMap[dk].count += 1;
+    }
+  });
+
+  const mesTipo = Object.entries(mesMap)
+    .map(([k, v]) => ({ mes: k.split('|||')[0], mesLabel: v.mesLabel, tipo: v.tipo, count: v.count }))
+    .sort((a, b) => a.mes.localeCompare(b.mes));
+
+  const diaTipo = Object.entries(diaMap)
+    .map(([k, v]) => {
+      const fecha = k.split('|||')[0];
+      const [, , d] = fecha.split('-');
+      return { fecha, fechaLabel: `${d}/${v.mes.split('-')[1]}`, mes: v.mes, mesLabel: v.mesLabel, tipo: v.tipo, count: v.count };
+    })
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  return { mesTipo, diaTipo };
+}
+
 export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
   // Filtro único a la entrada: "OTRO"/"OTROS"/"NN" son proyectos sin
   // clasificar, no reales — se excluyen de TODA la página (total, por

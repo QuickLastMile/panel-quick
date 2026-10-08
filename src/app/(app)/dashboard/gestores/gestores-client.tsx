@@ -5,8 +5,11 @@ import type { ServiceRow } from '@/lib/sheets';
 import type { GestorStat } from '@/lib/aggregate';
 import type { SimpleDate } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
+import type { TipoAsignadorTrend } from '@/lib/aggregate';
 import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
+import AsignadorMesChart from '@/components/charts/asignador-mes-chart';
+import AsignadorDiaTrendChart from '@/components/charts/asignador-dia-trend-chart';
 import GestorDetailPanel from '@/components/gestor-detail-panel';
 
 const EN_PROCESO_COLOR = STATUS_COLOR['Asignado'];
@@ -20,11 +23,13 @@ const TIPO_ASIGNADOR_LABEL: Record<string, string> = {
 export default function GestoresClient({
   gestorStats,
   porTipoAsignador,
+  asignadorTrend,
   allRows,
   defaultDay,
 }: {
   gestorStats: GestorStat[];
   porTipoAsignador: { key: string; count: number }[];
+  asignadorTrend: TipoAsignadorTrend;
   allRows: ServiceRow[];
   defaultDay: SimpleDate;
 }) {
@@ -88,36 +93,6 @@ export default function GestoresClient({
         )}
       </ChartCard>
 
-      <ChartCard
-        title="Quién está asignando — Agilizador vs. Administrativo"
-        description='Columna "Tipo Asignador" del Sheet — quién hizo la asignación del servicio. "Otro" son agilizadores externos o servicios sin asignar.'
-        className="mb-5"
-      >
-        {porTipoAsignador.length ? (
-          <>
-            {(asignadorPorTipo.agilizador > 0 || asignadorPorTipo.coordinador > 0) && (
-              <div className="mb-4 grid grid-cols-2 gap-3">
-                <div className="panel-card rounded-xl p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por agilizadores</p>
-                  <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{asignadorPorTipo.pctAgilizador}%</p>
-                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios</p>
-                </div>
-                <div className="panel-card rounded-xl p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por administrativos</p>
-                  <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{asignadorPorTipo.pctCoordinador}%</p>
-                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios</p>
-                </div>
-              </div>
-            )}
-            <RankingBarList
-              items={porTipoAsignador.map((t) => ({ key: TIPO_ASIGNADOR_LABEL[t.key] || t.key, count: t.count }))}
-            />
-          </>
-        ) : (
-          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
-        )}
-      </ChartCard>
-
       <ChartCard title="Productividad por gestor" description="% cumplimiento = finalizados / total de servicios del gestor. Clic en un gestor para ver su detalle.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-xs">
@@ -168,6 +143,51 @@ export default function GestoresClient({
             </tbody>
           </table>
         </div>
+      </ChartCard>
+
+      <ChartCard
+        title="Quién está asignando — Agilizador vs. Administrativo"
+        description='Columna "Tipo Asignador" del Sheet — quién hizo la asignación del servicio. "Otro" son agilizadores externos o servicios sin asignar.'
+        className="mb-5"
+      >
+        {porTipoAsignador.length ? (
+          <>
+            {(asignadorPorTipo.agilizador > 0 || asignadorPorTipo.coordinador > 0) && (
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="panel-card rounded-xl p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por agilizadores</p>
+                  <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{asignadorPorTipo.pctAgilizador}%</p>
+                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios</p>
+                </div>
+                <div className="panel-card rounded-xl p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por administrativos</p>
+                  <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{asignadorPorTipo.pctCoordinador}%</p>
+                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios</p>
+                </div>
+              </div>
+            )}
+            <RankingBarList
+              items={porTipoAsignador.map((t) => ({ key: TIPO_ASIGNADOR_LABEL[t.key] || t.key, count: t.count }))}
+            />
+          </>
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
+        )}
+      </ChartCard>
+
+      <ChartCard
+        title="Asignación por mes — Agilizador vs. Administrativo"
+        description="Histórico completo, independiente del filtro de día de la página."
+        className="mb-5"
+      >
+        <AsignadorMesChart mesTipo={asignadorTrend.mesTipo} />
+      </ChartCard>
+
+      <ChartCard
+        title="Tendencia diaria — Agilizador vs. Administrativo"
+        description="Histórico completo, independiente del filtro de día — filtra por mes desde aquí."
+      >
+        <AsignadorDiaTrendChart diaTipo={asignadorTrend.diaTipo} />
       </ChartCard>
 
       <GestorDetailPanel gestor={openGestor} allRows={allRows} defaultDay={defaultDay} onClose={() => setOpenGestor(null)} />
