@@ -30,6 +30,7 @@ export default async function GestoresPage({
       <DateFilterBar filter={filter} />
       <GestoresClient
         gestorStats={data.gestorStats}
+        porTipoAsignador={data.porTipoAsignador}
         allRows={cleanRows}
         defaultDay={{ year: filter.year, month: filter.month, day: filter.day }}
       />

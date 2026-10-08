@@ -11,12 +11,20 @@ import GestorDetailPanel from '@/components/gestor-detail-panel';
 
 const EN_PROCESO_COLOR = STATUS_COLOR['Asignado'];
 
+const TIPO_ASIGNADOR_LABEL: Record<string, string> = {
+  AGILIZADOR: 'Agilizador',
+  COORDINADOR: 'Administrativo (Coordinador)',
+  OTRO: 'Otro / externo',
+};
+
 export default function GestoresClient({
   gestorStats,
+  porTipoAsignador,
   allRows,
   defaultDay,
 }: {
   gestorStats: GestorStat[];
+  porTipoAsignador: { key: string; count: number }[];
   allRows: ServiceRow[];
   defaultDay: SimpleDate;
 }) {
@@ -24,6 +32,19 @@ export default function GestoresClient({
   const [openGestor, setOpenGestor] = useState<string | null>(null);
 
   const gestores = useMemo(() => gestorStats.map((g) => g.gestor).sort((a, b) => a.localeCompare(b, 'es')), [gestorStats]);
+
+  const asignadorPorTipo = useMemo(() => {
+    const byKey = Object.fromEntries(porTipoAsignador.map((t) => [t.key, t.count]));
+    const agilizador = byKey['AGILIZADOR'] || 0;
+    const coordinador = byKey['COORDINADOR'] || 0;
+    const base = agilizador + coordinador;
+    return {
+      agilizador,
+      coordinador,
+      pctAgilizador: base ? Math.round((agilizador / base) * 1000) / 10 : 0,
+      pctCoordinador: base ? Math.round((coordinador / base) * 1000) / 10 : 0,
+    };
+  }, [porTipoAsignador]);
 
   const filteredStats = useMemo(
     () => (fGestor ? gestorStats.filter((g) => g.gestor === fGestor) : gestorStats),
@@ -62,6 +83,36 @@ export default function GestoresClient({
       >
         {filteredStats.length ? (
           <RankingBarList items={filteredStats.map((g) => ({ key: g.gestor, count: g.total }))} />
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
+        )}
+      </ChartCard>
+
+      <ChartCard
+        title="Quién está asignando — Agilizador vs. Administrativo"
+        description='Columna "Tipo Asignador" del Sheet — quién hizo la asignación del servicio. "Otro" son agilizadores externos o servicios sin asignar.'
+        className="mb-5"
+      >
+        {porTipoAsignador.length ? (
+          <>
+            {(asignadorPorTipo.agilizador > 0 || asignadorPorTipo.coordinador > 0) && (
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="panel-card rounded-xl p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por agilizadores</p>
+                  <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{asignadorPorTipo.pctAgilizador}%</p>
+                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios</p>
+                </div>
+                <div className="panel-card rounded-xl p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por administrativos</p>
+                  <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{asignadorPorTipo.pctCoordinador}%</p>
+                  <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios</p>
+                </div>
+              </div>
+            )}
+            <RankingBarList
+              items={porTipoAsignador.map((t) => ({ key: TIPO_ASIGNADOR_LABEL[t.key] || t.key, count: t.count }))}
+            />
+          </>
         ) : (
           <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
         )}

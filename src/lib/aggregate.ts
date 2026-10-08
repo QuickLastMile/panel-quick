@@ -49,6 +49,7 @@ export type DashboardData = {
   horaCiudad: { ciudad: string; proyecto: string; hora: number; fuente: 'servicio' | 'creacion'; count: number }[];
   porServicio: { key: string; count: number }[];
   porTipoServicio: { key: string; count: number }[];
+  porTipoAsignador: { key: string; count: number }[];
   gestorStats: GestorStat[];
 };
 
@@ -172,9 +173,11 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
 
   const porServicioMap: Record<string, number> = {};
   const porTipoServicioMap: Record<string, number> = {};
+  const porTipoAsignadorMap: Record<string, number> = {};
   rows.forEach((r) => {
     if (r.servicio) bump(porServicioMap, r.servicio);
     if (r.tipoServicio) bump(porTipoServicioMap, r.tipoServicio);
+    if (r.tipoAsignador) bump(porTipoAsignadorMap, r.tipoAsignador);
   });
 
   const porGestor: Record<string, { cargo: string; total: number; finalizado: number; cancelado: number; enProceso: number }> = {};
@@ -228,6 +231,7 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     }),
     porServicio: toPairs(porServicioMap).sort((a, b) => b.count - a.count),
     porTipoServicio: toPairs(porTipoServicioMap).sort((a, b) => b.count - a.count),
+    porTipoAsignador: toPairs(porTipoAsignadorMap).sort((a, b) => b.count - a.count),
     gestorStats,
   };
 }
@@ -335,6 +339,9 @@ export function findDobleAsignacion(rows: ServiceRow[]): DobleAsignacion[] {
     if (!r.identTrabajador || !r.fechaSolicitud) return;
     if (isSinClasificar(r.proyecto)) return;
     if (TERMINAL.has(normEstado(r.estado))) return;
+    // Mensajeros de prueba (ej. "prueba prueba") no son reales — no deben
+    // disparar la alerta.
+    if (r.nombreTrabajador.toLowerCase().includes('prueba')) return;
     const key = `${r.identTrabajador}|||${r.fechaSolicitud}`;
     if (!map[key]) {
       map[key] = { identTrabajador: r.identTrabajador, nombreTrabajador: r.nombreTrabajador || r.identTrabajador, fechaSolicitud: r.fechaSolicitud, rows: [] };

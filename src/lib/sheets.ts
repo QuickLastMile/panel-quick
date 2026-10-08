@@ -36,6 +36,9 @@ export type ServiceRow = {
   // "AAAA-MM-DD HH:MM:SS" — momento real en que el servicio pasó a
   // Asignado (vacío si nunca se asignó, ej. se canceló antes).
   fechaHoraAsignado: string;
+  // AGILIZADOR / COORDINADOR / OTRO — quién hizo la asignación: el propio
+  // gestor, alguien administrativo, u otro (externo o sin asignar).
+  tipoAsignador: string;
 };
 
 function getAuth() {
@@ -110,6 +113,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     descripcion: idx('Descripcion'),
     diasAnticipadosCreacion: idx('DÍAS ANTICIPADAS DE CREACIÓN'),
     fechaHoraAsignado: idx('Fecha Hora Asignado'),
+    tipoAsignador: idx('TIPO ASIGNADOR'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
@@ -151,6 +155,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       descripcion: String(get(row, COLS.descripcion) || ''),
       diasAnticipadosCreacion: getNum(row, COLS.diasAnticipadosCreacion),
       fechaHoraAsignado: String(get(row, COLS.fechaHoraAsignado) || ''),
+      tipoAsignador: String(get(row, COLS.tipoAsignador) || ''),
     }))
     .filter((r) => r.id);
 
