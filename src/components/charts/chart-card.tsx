@@ -12,7 +12,9 @@ export default function ChartCard({
 }: {
   title: string;
   description?: string;
-  children: React.ReactNode;
+  // Función opcional: recibe `expanded` para poder mostrar controles extra
+  // (ej. un filtro de fecha propio) solo en la vista ampliada ("Ampliar").
+  children: React.ReactNode | ((expanded: boolean) => React.ReactNode);
   className?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -61,11 +63,13 @@ export default function ChartCard({
     );
   }
 
+  const content = (exp: boolean) => (typeof children === 'function' ? children(exp) : children);
+
   return (
     <>
       <div className={`panel-card rounded-xl p-5 ${className || ''}`}>
         <Header inModal={false} />
-        <div className="mt-3">{children}</div>
+        <div className="mt-3">{content(false)}</div>
       </div>
 
       {expanded &&
@@ -82,7 +86,7 @@ export default function ChartCard({
             />
             <div className="fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-2xl md:inset-10">
               <Header inModal />
-              <div className="mt-3 flex-1 overflow-auto">{children}</div>
+              <div className="mt-3 flex-1 overflow-auto">{content(true)}</div>
             </div>
           </>,
           document.body

@@ -31,6 +31,27 @@ function bump(map: Record<string, number>, key: string) {
   map[key] = (map[key] || 0) + 1;
 }
 
+// Quick a veces guarda el mismo motivo repetido y concatenado con "-" (ej.
+// "Cliente cancela servicio- Cliente cancela servicio") — sin esto, cada
+// variante de ese error aparece como un motivo distinto en la gráfica.
+function normalizeMotivoCancelacion(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return 'Sin motivo registrado';
+  const parts = trimmed.split(/\s*-\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1 && parts.every((p) => p.toLowerCase() === parts[0].toLowerCase())) {
+    return parts[0];
+  }
+  return trimmed;
+}
+
+export const WEEKDAY_LABELS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+// getUTCDay() da 0=domingo..6=sábado; esta tabla lo reordena a lunes-primero
+// (WEEKDAY_LABELS) sin tocar el índice nativo de JS en ningún otro lado.
+function weekdayIndexMondayFirst(jsWeekday: number): number {
+  return (jsWeekday + 6) % 7;
+}
+
 export type GestorStat = {
   gestor: string;
   cargo: string;
@@ -54,6 +75,8 @@ export type DashboardData = {
   porServicio: { key: string; count: number }[];
   porTipoServicio: { key: string; count: number }[];
   porTipoAsignador: { key: string; count: number }[];
+  porJefatura: { key: string; count: number }[];
+  porMotivoCancelacion: { key: string; count: number }[];
   gestorStats: GestorStat[];
 };
 
@@ -226,10 +249,23 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
   const porServicioMap: Record<string, number> = {};
   const porTipoServicioMap: Record<string, number> = {};
   const porTipoAsignadorMap: Record<string, number> = {};
+  const porJefaturaMap: Record<string, number> = {};
+  const porMotivoCancelacionMap: Record<string, number> = {};
   rows.forEach((r) => {
     if (r.servicio) bump(porServicioMap, r.servicio);
-    if (r.tipoServicio) bump(porTipoServicioMap, r.tipoServicio);
+    if (r.tipoServicio) {
+      // "Domicilio" y "Mensajería" son el mismo tipo de vehículo para la
+      // operación — se unifican en una sola barra. El Sheet trae "Mensajeria"
+      // sin tilde, así que hay que normalizar también esa variante o quedan
+      // como dos barras distintas.
+      const upper = r.tipoServicio.trim().toUpperCase();
+      const tipo = upper === 'DOMICILIO' || upper === 'MENSAJERIA' || upper === 'MENSAJERÍA' ? 'Mensajería' : r.tipoServicio;
+      bump(porTipoServicioMap, tipo);
+    }
     if (r.tipoAsignador && !EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) bump(porTipoAsignadorMap, r.tipoAsignador);
+    const j = r.jefatura.trim();
+    if (j && !SIN_CLASIFICAR.has(j.toUpperCase())) bump(porJefaturaMap, j);
+    if (normEstado(r.estado) === 'Cancelado') bump(porMotivoCancelacionMap, normalizeMotivoCancelacion(r.razonCancelacion));
   });
 
   const porGestor: Record<string, { cargo: string; total: number; finalizado: number; cancelado: number; enProceso: number }> = {};
@@ -284,8 +320,62 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     porServicio: toPairs(porServicioMap).sort((a, b) => b.count - a.count),
     porTipoServicio: toPairs(porTipoServicioMap).sort((a, b) => b.count - a.count),
     porTipoAsignador: toPairs(porTipoAsignadorMap).sort((a, b) => b.count - a.count),
+    porJefatura: toPairs(porJefaturaMap).sort((a, b) => b.count - a.count),
+    porMotivoCancelacion: toPairs(porMotivoCancelacionMap).sort((a, b) => b.count - a.count),
     gestorStats,
   };
+}
+
+export type DiaJefaturaPoint = { fecha: string; fechaLabel: string; mes: string; mesLabel: string; jefatura: string; count: number };
+
+// Mismo patrón que buildTrendData: histórico completo, independiente del
+// filtro de día de la página — para la gráfica de "Servicios por jefatura",
+// cuya vista ampliada necesita poder consultar otros días/meses.
+export function buildJefaturaTrend(rows: ServiceRow[]): DiaJefaturaPoint[] {
+  const diaMap: Record<string, { mesLabel: string; mes: string; jefatura: string; count: number }> = {};
+
+  rows.forEach((r) => {
+    const j = r.jefatura.trim();
+    if (!j || SIN_CLASIFICAR.has(j.toUpperCase())) return;
+    if (!r.anioSolicitud || !r.mesNumSolicitud || !r.diaSolicitud) return;
+    const mesKey = `${r.anioSolicitud}-${pad2(r.mesNumSolicitud)}`;
+    const mesLabel = `${r.mesSolicitud} ${r.anioSolicitud}`;
+    const diaKey = `${mesKey}-${pad2(r.diaSolicitud)}`;
+    const dk = `${diaKey}|||${j}`;
+    if (!diaMap[dk]) diaMap[dk] = { mesLabel, mes: mesKey, jefatura: j, count: 0 };
+    diaMap[dk].count += 1;
+  });
+
+  return Object.entries(diaMap)
+    .map(([k, v]) => {
+      const fecha = k.split('|||')[0];
+      const d = fecha.split('-')[2];
+      return { fecha, fechaLabel: `${d}/${v.mes.split('-')[1]}`, mes: v.mes, mesLabel: v.mesLabel, jefatura: v.jefatura, count: v.count };
+    })
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+export type DiaSemanaPoint = { gestor: string; mes: string; mesLabel: string; weekday: number; count: number };
+
+// Histórico completo (no el filtro de día de la página) — distribución de
+// asignaciones por día de la semana (lunes=0..domingo=6), con desglose por
+// gestor y por mes para los filtros propios de la gráfica.
+export function buildDiaSemanaStats(rows: ServiceRow[]): DiaSemanaPoint[] {
+  const map: Record<string, { gestor: string; mes: string; mesLabel: string; weekday: number; count: number }> = {};
+
+  rows.forEach((r) => {
+    if (!r.anioSolicitud || !r.mesNumSolicitud || !r.diaSolicitud) return;
+    const g = r.gestor || 'SIN GESTOR';
+    if (SIN_CLASIFICAR.has(g.toUpperCase())) return;
+    const weekday = weekdayIndexMondayFirst(new Date(Date.UTC(r.anioSolicitud, r.mesNumSolicitud - 1, r.diaSolicitud)).getUTCDay());
+    const mesKey = `${r.anioSolicitud}-${pad2(r.mesNumSolicitud)}`;
+    const mesLabel = `${r.mesSolicitud} ${r.anioSolicitud}`;
+    const k = `${g}|||${mesKey}|||${weekday}`;
+    if (!map[k]) map[k] = { gestor: g, mes: mesKey, mesLabel, weekday, count: 0 };
+    map[k].count += 1;
+  });
+
+  return Object.values(map);
 }
 
 export type MensajeroStat = {

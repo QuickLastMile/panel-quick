@@ -1,6 +1,6 @@
 import { Package, Clock, UserCheck, Truck, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData, buildTrendData, listJefaturas, filterRowsByJefatura, findDobleAsignacion } from '@/lib/aggregate';
+import { buildDashboardData, buildTrendData, buildJefaturaTrend, listJefaturas, filterRowsByJefatura, findDobleAsignacion } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import PageHeader from '@/components/page-header';
@@ -14,6 +14,7 @@ import FranjaChart from '@/components/charts/franja-chart';
 import CiudadChart from '@/components/charts/ciudad-chart';
 import MesChart from '@/components/charts/mes-chart';
 import DiaTrendChart from '@/components/charts/dia-trend-chart';
+import JefaturaChartCard from '@/components/charts/jefatura-chart-card';
 import DobleAsignacionAlert from '@/components/doble-asignacion-alert';
 
 const STATUS_ICON = {
@@ -44,6 +45,7 @@ export default async function ResumenPage({
   // acotado por jefatura), a propósito desacoplados del filtro de día/mes de
   // la página — cada uno trae su propio filtro de proyecto/mes.
   const trend = buildTrendData(jefaturaRows);
+  const jefaturaTrend = buildJefaturaTrend(jefaturaRows);
   // Independiente del filtro de día — una asignación doble es un problema
   // sin importar qué día esté mirando la página ahora mismo.
   const dobleAsignacion = findDobleAsignacion(jefaturaRows);
@@ -117,7 +119,7 @@ export default async function ResumenPage({
             <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
           )}
         </ChartCard>
-        <ChartCard title="Servicios por tipo de vehículo" description='Columna "Tipo de Servicio" — Domicilio / Mensajería / Carry'>
+        <ChartCard title="Servicios por tipo de vehículo" description='Columna "Tipo de Servicio" — Mensajería (incluye Domicilio) / Carry'>
           {data.porTipoServicio.length ? (
             <RankingBarList items={data.porTipoServicio} />
           ) : (
@@ -125,6 +127,24 @@ export default async function ResumenPage({
           )}
         </ChartCard>
       </div>
+
+      <JefaturaChartCard
+        porJefatura={data.porJefatura}
+        diaJefatura={jefaturaTrend}
+        description={`Usa el filtro de fecha de arriba (${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}) — al ampliar puedes elegir otro mes/día.`}
+      />
+
+      <ChartCard
+        title="Motivos de cancelación"
+        description={`Servicios cancelados — por motivo. Usa el filtro de fecha de arriba (${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}).`}
+        className="mb-5"
+      >
+        {data.porMotivoCancelacion.length ? (
+          <RankingBarList items={data.porMotivoCancelacion} color="#e2574c" />
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin cancelaciones para esta fecha.</p>
+        )}
+      </ChartCard>
 
       <ChartCard
         title="Servicios por mes"

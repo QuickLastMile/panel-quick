@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ServiceRow } from '@/lib/sheets';
-import type { GestorStat } from '@/lib/aggregate';
+import type { GestorStat, DiaSemanaPoint } from '@/lib/aggregate';
 import type { SimpleDate } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import type { TipoAsignadorTrend } from '@/lib/aggregate';
@@ -10,6 +10,7 @@ import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
 import AsignadorMesChart from '@/components/charts/asignador-mes-chart';
 import AsignadorDiaTrendChart from '@/components/charts/asignador-dia-trend-chart';
+import DiaSemanaChart from '@/components/charts/dia-semana-chart';
 import GestorDetailPanel from '@/components/gestor-detail-panel';
 
 const EN_PROCESO_COLOR = STATUS_COLOR['Asignado'];
@@ -24,12 +25,14 @@ export default function GestoresClient({
   gestorStats,
   porTipoAsignador,
   asignadorTrend,
+  diaSemana,
   allRows,
   defaultDay,
 }: {
   gestorStats: GestorStat[];
   porTipoAsignador: { key: string; count: number }[];
   asignadorTrend: TipoAsignadorTrend;
+  diaSemana: DiaSemanaPoint[];
   allRows: ServiceRow[];
   defaultDay: SimpleDate;
 }) {
@@ -56,6 +59,44 @@ export default function GestoresClient({
     [gestorStats, fGestor]
   );
 
+  // Efectividad general del período/filtro actual: finalizados / total de
+  // servicios de los gestores visibles (misma base que "Productividad por
+  // gestor" más abajo, solo que agregada).
+  const efectividad = useMemo(() => {
+    const total = filteredStats.reduce((s, g) => s + g.total, 0);
+    const finalizado = filteredStats.reduce((s, g) => s + g.finalizado, 0);
+    return total ? Math.round((finalizado / total) * 1000) / 10 : 0;
+  }, [filteredStats]);
+
+  // Censo de PERSONAS (no de servicios): cuántos gestores distintos son
+  // agilizador / administrativo / otro (vacaciones + supervisor), excluyendo
+  // "Agilizador no asignado" (es un relleno, no una persona real).
+  const cargoBreakdown = useMemo(() => {
+    let agilizador = 0;
+    let administrativo = 0;
+    let otro = 0;
+    let topAgilizador: GestorStat | null = null;
+    filteredStats.forEach((g) => {
+      const cargo = (g.cargo || '').trim().toUpperCase();
+      if (!cargo) return;
+      if (cargo.startsWith('AGILIZADOR NO ASIGNADO')) return;
+      if (cargo.startsWith('AGILIZADOR')) {
+        agilizador += 1;
+        if (!topAgilizador || g.total > topAgilizador.total) topAgilizador = g;
+      } else if (cargo.startsWith('ADMINISTRATIVO')) {
+        administrativo += 1;
+      } else if (cargo.startsWith('VACACIONES') || cargo.startsWith('SUPERVISOR')) {
+        otro += 1;
+      }
+    });
+    return { agilizador, administrativo, otro, topAgilizador } as {
+      agilizador: number;
+      administrativo: number;
+      otro: number;
+      topAgilizador: GestorStat | null;
+    };
+  }, [filteredStats]);
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-end gap-2.5">
@@ -80,6 +121,33 @@ export default function GestoresClient({
           </button>
         )}
       </div>
+
+      <ChartCard
+        title="Composición de gestores"
+        description='Conteo de personas, no de servicios. "Otro" = vacaciones + supervisor. Excluye "Agilizador no asignado".'
+        className="mb-5"
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Agilizadores</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{cargoBreakdown.agilizador}</p>
+            {cargoBreakdown.topAgilizador && (
+              <p className="text-xs text-[var(--text-muted)]">
+                Top: <span className="font-semibold text-[var(--text-secondary)]">{cargoBreakdown.topAgilizador.gestor}</span> (
+                {cargoBreakdown.topAgilizador.total.toLocaleString('es-CO')})
+              </p>
+            )}
+          </div>
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Administrativos</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{cargoBreakdown.administrativo}</p>
+          </div>
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Otro (vacaciones/supervisor)</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{cargoBreakdown.otro}</p>
+          </div>
+        </div>
+      </ChartCard>
 
       <ChartCard
         title="Servicios por gestor"
@@ -153,7 +221,7 @@ export default function GestoresClient({
         {porTipoAsignador.length ? (
           <>
             {(asignadorPorTipo.agilizador > 0 || asignadorPorTipo.coordinador > 0) && (
-              <div className="mb-4 grid grid-cols-2 gap-3">
+              <div className="mb-4 grid grid-cols-3 gap-3">
                 <div className="panel-card rounded-xl p-4">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por agilizadores</p>
                   <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{asignadorPorTipo.pctAgilizador}%</p>
@@ -163,6 +231,13 @@ export default function GestoresClient({
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignado por administrativos</p>
                   <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{asignadorPorTipo.pctCoordinador}%</p>
                   <p className="text-xs text-[var(--text-muted)]">{asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios</p>
+                </div>
+                <div className="panel-card rounded-xl p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Efectividad</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: STATUS_COLOR['Finalizado'] }}>
+                    {efectividad}%
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">Finalizados / total ({fGestor || 'todos los gestores'})</p>
                 </div>
               </div>
             )}
@@ -186,8 +261,16 @@ export default function GestoresClient({
       <ChartCard
         title="Tendencia diaria — Agilizador vs. Administrativo"
         description="Histórico completo, independiente del filtro de día — filtra por mes desde aquí."
+        className="mb-5"
       >
         <AsignadorDiaTrendChart diaTipo={asignadorTrend.diaTipo} />
+      </ChartCard>
+
+      <ChartCard
+        title="Asignaciones por día de la semana"
+        description="Histórico completo — filtra por gestor y por mes desde aquí."
+      >
+        <DiaSemanaChart diaSemana={diaSemana} />
       </ChartCard>
 
       <GestorDetailPanel gestor={openGestor} allRows={allRows} defaultDay={defaultDay} onClose={() => setOpenGestor(null)} />
