@@ -24,14 +24,15 @@ const TIPO_ASIGNADOR_LABEL: Record<string, string> = {
   OTRO: 'Otro / externo',
 };
 
-function formatMinutos(min: number): string {
-  // Redondea el total primero y luego separa en horas/minutos — redondear
-  // cada parte por separado puede "acarrear" un 59.6 a "60min" sueltos.
-  const total = Math.round(min);
-  if (total < 60) return `${total} min`;
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${h}h ${m}min`;
+// Formato militar HH:MM:SS para cualquier duración/tiempo promedio — se
+// redondea a segundos enteros antes de separar en h/m/s para no "acarrear"
+// un 59.6 suelto a un campo que ya pasó.
+function formatDuracionHMS(minutos: number): string {
+  const totalSeconds = Math.round(minutos * 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 export default function GestoresClient({
@@ -121,16 +122,22 @@ export default function GestoresClient({
     };
   }, [filteredStats]);
 
-  const horaAsignacionPoints = useMemo(
-    () => porHoraAsignacion.map((p) => ({ label: `${String(p.hora).padStart(2, '0')}:00`, value: p.count })),
-    [porHoraAsignacion]
-  );
+  // Recorta las horas sin ningún dato al inicio/fin (ej. de madrugada) —
+  // conserva huecos en medio, solo quita los bordes vacíos.
+  const horaAsignacionPoints = useMemo(() => {
+    const first = porHoraAsignacion.findIndex((p) => p.count > 0);
+    const last = porHoraAsignacion.length - 1 - [...porHoraAsignacion].reverse().findIndex((p) => p.count > 0);
+    if (first === -1) return [];
+    return porHoraAsignacion
+      .slice(first, last + 1)
+      .map((p) => ({ label: `${String(p.hora).padStart(2, '0')}:00`, value: p.count }));
+  }, [porHoraAsignacion]);
 
   const gestorChartItems = useMemo(() => {
     if (gestorView === 'cantidad') return filteredStats.map((g) => ({ key: g.gestor, count: g.total }));
     return filteredStats
       .filter((g) => g.minutosAsignacionCount > 0)
-      .map((g) => ({ key: g.gestor, count: Math.round(g.minutosAsignacionSum / g.minutosAsignacionCount) }))
+      .map((g) => ({ key: g.gestor, count: g.minutosAsignacionSum / g.minutosAsignacionCount }))
       .sort((a, b) => a.count - b.count);
   }, [filteredStats, gestorView]);
 
@@ -163,16 +170,16 @@ export default function GestoresClient({
         <StatCard label="Agilizadores" value={String(cargoBreakdown.agilizador)} icon={Users} iconColor="#f3c94f" sub={cargoBreakdown.topAgilizador ? `Top: ${cargoBreakdown.topAgilizador.gestor}` : undefined} />
         <StatCard label="Administrativos" value={String(cargoBreakdown.administrativo)} icon={UserCog} iconColor="#4f9df5" />
         <StatCard label="Otro (vac./superv.)" value={String(cargoBreakdown.otro)} icon={Users2} iconColor="#8a8a8a" />
-        <StatCard label="Asignado por agiliz." value={`${asignadorPorTipo.pctAgilizador}%`} icon={Percent} iconColor="#f3c94f" sub={`${asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios`} />
-        <StatCard label="Asignado por admin." value={`${asignadorPorTipo.pctCoordinador}%`} icon={Percent} iconColor="#4f9df5" sub={`${asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios`} />
-        <StatCard label="Efectividad" value={`${efectividad}%`} icon={CheckCircle2} iconColor={STATUS_COLOR['Finalizado']} sub="Asignado + En tránsito + Finalizado / total" />
         <StatCard
           label="Tiempo prom. asignación"
-          value={tiempoPromedioAsignacion !== null ? formatMinutos(tiempoPromedioAsignacion) : '—'}
+          value={tiempoPromedioAsignacion !== null ? formatDuracionHMS(tiempoPromedioAsignacion) : '—'}
           icon={Timer}
           iconColor="#e2574c"
           sub="Desde creación hasta asignación"
         />
+        <StatCard label="Asignado por agiliz." value={`${asignadorPorTipo.pctAgilizador}%`} icon={Percent} iconColor="#f3c94f" sub={`${asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios`} />
+        <StatCard label="Asignado por admin." value={`${asignadorPorTipo.pctCoordinador}%`} icon={Percent} iconColor="#4f9df5" sub={`${asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios`} />
+        <StatCard label="Efectividad" value={`${efectividad}%`} icon={CheckCircle2} iconColor={STATUS_COLOR['Finalizado']} sub="Asignado + En tránsito + Finalizado / total" />
       </div>
 
       <ChartCard
@@ -207,11 +214,11 @@ export default function GestoresClient({
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
             }`}
           >
-            Tiempo promedio (min)
+            Tiempo promedio
           </button>
         </div>
         {gestorChartItems.length ? (
-          <RankingBarList items={gestorChartItems} />
+          <RankingBarList items={gestorChartItems} formatValue={gestorView === 'tiempo' ? formatDuracionHMS : undefined} />
         ) : (
           <p className="py-8 text-center text-sm text-[var(--text-muted)]">
             {gestorView === 'tiempo' ? 'Sin datos de tiempo de asignación para este filtro.' : 'Sin servicios para esta fecha.'}
@@ -265,7 +272,7 @@ export default function GestoresClient({
                     </div>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums text-[var(--text-secondary)]">
-                    {g.minutosAsignacionCount ? formatMinutos(g.minutosAsignacionSum / g.minutosAsignacionCount) : '—'}
+                    {g.minutosAsignacionCount ? formatDuracionHMS(g.minutosAsignacionSum / g.minutosAsignacionCount) : '—'}
                   </td>
                 </tr>
               ))}
