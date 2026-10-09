@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export default function StatCard({
   label,
@@ -9,7 +10,7 @@ export default function StatCard({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: ReactNode;
   icon: LucideIcon;
   iconBg?: string;
   iconColor?: string;

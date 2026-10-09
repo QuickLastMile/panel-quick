@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Users, UserCog, Users2, Percent, CheckCircle2, Timer } from 'lucide-react';
+import { Users, UserCog, Users2, Percent, CheckCircle2, Timer, Medal } from 'lucide-react';
 import type { ServiceRow } from '@/lib/sheets';
 import type { GestorStat, DiaSemanaPoint } from '@/lib/aggregate';
 import type { SimpleDate } from '@/lib/date-filter';
@@ -167,7 +167,20 @@ export default function GestoresClient({
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <StatCard label="Agilizadores" value={String(cargoBreakdown.agilizador)} icon={Users} iconColor="#f3c94f" sub={cargoBreakdown.topAgilizador ? `Top: ${cargoBreakdown.topAgilizador.gestor}` : undefined} />
+        <StatCard
+          label="Agilizadores"
+          value={String(cargoBreakdown.agilizador)}
+          icon={Users}
+          iconColor="#f3c94f"
+          sub={
+            cargoBreakdown.topAgilizador ? (
+              <span className="inline-flex items-center gap-1">
+                <Medal size={12} className="flex-none text-[#f3c94f]" />
+                {cargoBreakdown.topAgilizador.gestor}
+              </span>
+            ) : undefined
+          }
+        />
         <StatCard label="Administrativos" value={String(cargoBreakdown.administrativo)} icon={UserCog} iconColor="#4f9df5" />
         <StatCard label="Otro (vac./superv.)" value={String(cargoBreakdown.otro)} icon={Users2} iconColor="#8a8a8a" />
         <StatCard
