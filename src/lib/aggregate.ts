@@ -60,6 +60,14 @@ export type GestorStat = {
   cancelado: number;
   enProceso: number;
   cumplimientoPct: number;
+  // Para "efectividad" = (asignado + enTransito + finalizado) / total.
+  asignado: number;
+  enTransito: number;
+  // Minutos Tiempo Asignado (Sheet) acumulado — promedio = Sum/Count. Se
+  // exponen crudos (no ya promediados) para poder agregar correctamente
+  // entre varios gestores sin promediar promedios.
+  minutosAsignacionSum: number;
+  minutosAsignacionCount: number;
 };
 
 export type DashboardData = {
@@ -77,6 +85,7 @@ export type DashboardData = {
   porTipoAsignador: { key: string; count: number }[];
   porJefatura: { key: string; count: number }[];
   porMotivoCancelacion: { key: string; count: number }[];
+  porHoraAsignacion: { hora: number; count: number }[];
   gestorStats: GestorStat[];
 };
 
@@ -268,17 +277,60 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     if (normEstado(r.estado) === 'Cancelado') bump(porMotivoCancelacionMap, normalizeMotivoCancelacion(r.razonCancelacion));
   });
 
-  const porGestor: Record<string, { cargo: string; total: number; finalizado: number; cancelado: number; enProceso: number }> = {};
+  // "00:00:00" es el valor de relleno de Quick cuando nunca se asignó — se
+  // distingue de una asignación real a medianoche usando fechaHoraAsignado
+  // (vacío si nunca se asignó).
+  const porHoraAsignacionMap: Record<number, number> = {};
+  rows.forEach((r) => {
+    if (!r.fechaHoraAsignado) return;
+    const h = parseHour(r.horaAsignacion);
+    if (h === null) return;
+    porHoraAsignacionMap[h] = (porHoraAsignacionMap[h] || 0) + 1;
+  });
+  const porHoraAsignacion = Array.from({ length: 24 }, (_, hora) => ({ hora, count: porHoraAsignacionMap[hora] || 0 }));
+
+  const porGestor: Record<
+    string,
+    {
+      cargo: string;
+      total: number;
+      finalizado: number;
+      cancelado: number;
+      enProceso: number;
+      asignado: number;
+      enTransito: number;
+      minutosAsignacionSum: number;
+      minutosAsignacionCount: number;
+    }
+  > = {};
   rows.forEach((r) => {
     const g = r.gestor || 'SIN GESTOR';
     if (SIN_CLASIFICAR.has(g.toUpperCase())) return;
-    if (!porGestor[g]) porGestor[g] = { cargo: r.cargoGestor || '', total: 0, finalizado: 0, cancelado: 0, enProceso: 0 };
+    if (!porGestor[g]) {
+      porGestor[g] = {
+        cargo: r.cargoGestor || '',
+        total: 0,
+        finalizado: 0,
+        cancelado: 0,
+        enProceso: 0,
+        asignado: 0,
+        enTransito: 0,
+        minutosAsignacionSum: 0,
+        minutosAsignacionCount: 0,
+      };
+    }
     const entry = porGestor[g];
     entry.total += 1;
     const e = normEstado(r.estado);
     if (e === 'Finalizado') entry.finalizado += 1;
     else if (e === 'Cancelado') entry.cancelado += 1;
     else entry.enProceso += 1;
+    if (r.estado === 'Asignado') entry.asignado += 1;
+    else if (e === 'En Tránsito') entry.enTransito += 1;
+    if (r.minutosAsignacion != null) {
+      entry.minutosAsignacionSum += r.minutosAsignacion;
+      entry.minutosAsignacionCount += 1;
+    }
   });
 
   const gestorStats: GestorStat[] = Object.entries(porGestor)
@@ -290,6 +342,10 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
       cancelado: v.cancelado,
       enProceso: v.enProceso,
       cumplimientoPct: v.total ? Math.round((v.finalizado / v.total) * 1000) / 10 : 0,
+      asignado: v.asignado,
+      enTransito: v.enTransito,
+      minutosAsignacionSum: v.minutosAsignacionSum,
+      minutosAsignacionCount: v.minutosAsignacionCount,
     }))
     .sort((a, b) => b.total - a.total);
 
@@ -322,6 +378,7 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     porTipoAsignador: toPairs(porTipoAsignadorMap).sort((a, b) => b.count - a.count),
     porJefatura: toPairs(porJefaturaMap).sort((a, b) => b.count - a.count),
     porMotivoCancelacion: toPairs(porMotivoCancelacionMap).sort((a, b) => b.count - a.count),
+    porHoraAsignacion,
     gestorStats,
   };
 }

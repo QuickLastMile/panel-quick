@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 
-const SHEET_RANGE = 'Datos_Actuales!A:DY';
+const SHEET_RANGE = 'Datos_Actuales!A:DZ';
 
 export type ServiceRow = {
   id: string;
@@ -39,6 +39,13 @@ export type ServiceRow = {
   // AGILIZADOR / COORDINADOR / OTRO — quién hizo la asignación: el propio
   // gestor, alguien administrativo, u otro (externo o sin asignar).
   tipoAsignador: string;
+  // Solo la hora (HH:MM:SS) de `fechaHoraAsignado` — "00:00:00" cuando el
+  // servicio nunca se asignó (usar junto con fechaHoraAsignado para
+  // distinguir ese caso de una asignación real a medianoche).
+  horaAsignacion: string;
+  // Minutos entre FECHA/HORA CREACIÓN y Fecha Hora Asignado — ya calculado
+  // por Quick en el Sheet. Null si el servicio nunca se asignó.
+  minutosAsignacion: number | null;
 };
 
 function getAuth() {
@@ -114,6 +121,8 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     diasAnticipadosCreacion: idx('DÍAS ANTICIPADAS DE CREACIÓN'),
     fechaHoraAsignado: idx('Fecha Hora Asignado'),
     tipoAsignador: idx('TIPO ASIGNADOR'),
+    horaAsignacion: idx('HORA ASIGNACIÓN'),
+    minutosAsignacion: idx('Minutos Tiempo Asignado'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
@@ -156,6 +165,8 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       diasAnticipadosCreacion: getNum(row, COLS.diasAnticipadosCreacion),
       fechaHoraAsignado: String(get(row, COLS.fechaHoraAsignado) || ''),
       tipoAsignador: String(get(row, COLS.tipoAsignador) || ''),
+      horaAsignacion: String(get(row, COLS.horaAsignacion) || ''),
+      minutosAsignacion: getNum(row, COLS.minutosAsignacion),
     }))
     .filter((r) => r.id);
 

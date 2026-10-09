@@ -37,6 +37,7 @@ export default async function GestoresPage({
         porTipoAsignador={data.porTipoAsignador}
         asignadorTrend={asignadorTrend}
         diaSemana={diaSemana}
+        porHoraAsignacion={data.porHoraAsignacion}
         allRows={cleanRows}
         defaultDay={{ year: filter.year, month: filter.month, day: filter.day }}
       />
