@@ -159,7 +159,7 @@ export default function GestoresClient({
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <StatCard label="Agilizadores" value={String(cargoBreakdown.agilizador)} icon={Users} iconColor="#f3c94f" sub={cargoBreakdown.topAgilizador ? `Top: ${cargoBreakdown.topAgilizador.gestor}` : undefined} />
         <StatCard label="Administrativos" value={String(cargoBreakdown.administrativo)} icon={UserCog} iconColor="#4f9df5" />
         <StatCard label="Otro (vac./superv.)" value={String(cargoBreakdown.otro)} icon={Users2} iconColor="#8a8a8a" />
