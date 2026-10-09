@@ -2,6 +2,10 @@ import type { ServiceRow } from './sheets';
 
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
 const TERMINAL = new Set(['Finalizado', 'Cancelado']);
+// "DESCARTAR" son filas que no cuentan para este análisis (la fuente las
+// marca así); "#N/A" es un error de fórmula en el Sheet, no una categoría
+// real — ninguna de las dos debe aparecer en las gráficas de asignador.
+const EXCLUDE_TIPO_ASIGNADOR = new Set(['DESCARTAR', '#N/A']);
 
 export function isSinClasificar(value: string): boolean {
   return SIN_CLASIFICAR.has(value.toUpperCase());
@@ -153,7 +157,8 @@ export function buildTipoAsignadorTrend(rows: ServiceRow[]): TipoAsignadorTrend 
 
   rows.forEach((r) => {
     if (SIN_CLASIFICAR.has(r.proyecto.toUpperCase())) return;
-    if (!r.tipoAsignador || !r.anioSolicitud || !r.mesNumSolicitud) return;
+    if (!r.tipoAsignador || EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) return;
+    if (!r.anioSolicitud || !r.mesNumSolicitud) return;
     const mesKey = `${r.anioSolicitud}-${pad2(r.mesNumSolicitud)}`;
     const mesLabel = `${r.mesSolicitud} ${r.anioSolicitud}`;
     const mk = `${mesKey}|||${r.tipoAsignador}`;
@@ -224,7 +229,7 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
   rows.forEach((r) => {
     if (r.servicio) bump(porServicioMap, r.servicio);
     if (r.tipoServicio) bump(porTipoServicioMap, r.tipoServicio);
-    if (r.tipoAsignador) bump(porTipoAsignadorMap, r.tipoAsignador);
+    if (r.tipoAsignador && !EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) bump(porTipoAsignadorMap, r.tipoAsignador);
   });
 
   const porGestor: Record<string, { cargo: string; total: number; finalizado: number; cancelado: number; enProceso: number }> = {};

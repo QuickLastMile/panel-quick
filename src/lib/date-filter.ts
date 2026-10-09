@@ -1,12 +1,16 @@
 import type { ServiceRow } from './sheets';
 
-export type DateFilterMode = 'day' | 'month';
+export type DateFilterMode = 'day' | 'month' | 'range';
 
 export type DateFilter = {
   mode: DateFilterMode;
   year: number;
   month: number; // 1-12
-  day: number; // solo relevante en modo 'day'
+  day: number; // 'day': el día exacto. 'range': inicio del rango.
+  // Solo relevantes en modo 'range' — fin del rango (inclusive).
+  endYear?: number;
+  endMonth?: number;
+  endDay?: number;
 };
 
 // "Hoy" en hora de Bogotá, calculado en el servidor (Vercel corre en UTC).
@@ -35,10 +39,17 @@ export function parseFechaSolicitud(fecha: string): { year: number; month: numbe
 // Lee el filtro desde los searchParams de la URL; por defecto, hoy (modo día).
 export function parseDateFilterParams(searchParams: Record<string, string | string[] | undefined>): DateFilter {
   const today = bogotaToday();
-  const mode = searchParams.mode === 'month' ? 'month' : 'day';
+  const modeParam = searchParams.mode;
+  const mode: DateFilterMode = modeParam === 'month' ? 'month' : modeParam === 'range' ? 'range' : 'day';
   const year = Number(searchParams.year) || today.year;
   const month = Number(searchParams.month) || today.month;
   const day = Number(searchParams.day) || today.day;
+  if (mode === 'range') {
+    const endYear = Number(searchParams.endYear) || year;
+    const endMonth = Number(searchParams.endMonth) || month;
+    const endDay = Number(searchParams.endDay) || day;
+    return { mode, year, month, day, endYear, endMonth, endDay };
+  }
   return { mode, year, month, day };
 }
 
@@ -52,12 +63,34 @@ export function daysBetween(a: SimpleDate, b: SimpleDate): number {
   return Math.round((db - da) / 86400000);
 }
 
+// Entero comparable "AAAAMMDD" — suficiente para ordenar/comparar un rango
+// sin pasar por Date (evita cualquier lío de huso horario).
+function dateKey(d: SimpleDate): number {
+  return d.year * 10000 + d.month * 100 + d.day;
+}
+
 export function isToday(filter: DateFilter): boolean {
   const today = bogotaToday();
   return filter.mode === 'day' && filter.year === today.year && filter.month === today.month && filter.day === today.day;
 }
 
 export function filterRowsByDate(rows: ServiceRow[], filter: DateFilter): ServiceRow[] {
+  if (filter.mode === 'range') {
+    const startKey = dateKey({ year: filter.year, month: filter.month, day: filter.day });
+    const endKey = dateKey({
+      year: filter.endYear ?? filter.year,
+      month: filter.endMonth ?? filter.month,
+      day: filter.endDay ?? filter.day,
+    });
+    const lo = Math.min(startKey, endKey);
+    const hi = Math.max(startKey, endKey);
+    return rows.filter((r) => {
+      const f = parseFechaSolicitud(r.fechaSolicitud);
+      if (!f) return false;
+      const k = dateKey(f);
+      return k >= lo && k <= hi;
+    });
+  }
   return rows.filter((r) => {
     const f = parseFechaSolicitud(r.fechaSolicitud);
     if (!f) return false;
@@ -74,6 +107,15 @@ const MONTH_NAMES = [
 
 export function formatDateFilterLabel(filter: DateFilter): string {
   if (filter.mode === 'month') return `${MONTH_NAMES[filter.month - 1]} ${filter.year}`;
+  if (filter.mode === 'range') {
+    const endYear = filter.endYear ?? filter.year;
+    const endMonth = filter.endMonth ?? filter.month;
+    const endDay = filter.endDay ?? filter.day;
+    if (filter.year === endYear && filter.month === endMonth) {
+      return `${filter.day} al ${endDay} de ${MONTH_NAMES[filter.month - 1]} de ${filter.year}`;
+    }
+    return `${filter.day}/${filter.month}/${filter.year} al ${endDay}/${endMonth}/${endYear}`;
+  }
   return `${filter.day} de ${MONTH_NAMES[filter.month - 1]} de ${filter.year}`;
 }
 

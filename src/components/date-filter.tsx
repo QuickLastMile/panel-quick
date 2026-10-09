@@ -28,11 +28,22 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
     params.set('year', String(merged.year));
     params.set('month', String(merged.month));
     params.set('day', String(merged.day));
+    if (merged.mode === 'range') {
+      params.set('endYear', String(merged.endYear ?? merged.year));
+      params.set('endMonth', String(merged.endMonth ?? merged.month));
+      params.set('endDay', String(merged.endDay ?? merged.day));
+    } else {
+      params.delete('endYear');
+      params.delete('endMonth');
+      params.delete('endDay');
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 
   const dayValue = `${filter.year}-${pad2(filter.month)}-${pad2(filter.day)}`;
   const monthValue = `${filter.year}-${pad2(filter.month)}`;
+  const rangeStartValue = dayValue;
+  const rangeEndValue = `${filter.endYear ?? filter.year}-${pad2(filter.endMonth ?? filter.month)}-${pad2(filter.endDay ?? filter.day)}`;
 
   return (
     <div className="panel-card mb-5 flex flex-wrap items-center gap-2 rounded-xl p-2.5">
@@ -48,6 +59,23 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
           Día
         </button>
         <button
+          onClick={() =>
+            push({
+              mode: 'range',
+              endYear: filter.year,
+              endMonth: filter.month,
+              endDay: filter.day,
+            })
+          }
+          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+            filter.mode === 'range'
+              ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
+          }`}
+        >
+          Rango
+        </button>
+        <button
           onClick={() => push({ mode: 'month' })}
           className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
             filter.mode === 'month'
@@ -59,7 +87,7 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
         </button>
       </div>
 
-      {filter.mode === 'day' ? (
+      {filter.mode === 'day' && (
         <>
           <button
             onClick={() => push(addDays(filter, -1))}
@@ -88,7 +116,38 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
             <ChevronRight size={15} />
           </button>
         </>
-      ) : (
+      )}
+
+      {filter.mode === 'range' && (
+        <>
+          <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)]">
+            <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Desde</span>
+            <input
+              type="date"
+              value={rangeStartValue}
+              onChange={(e) => {
+                const [y, m, d] = e.target.value.split('-').map(Number);
+                if (y && m && d) push({ mode: 'range', year: y, month: m, day: d });
+              }}
+              className="bg-transparent outline-none [color-scheme:dark]"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)]">
+            <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Hasta</span>
+            <input
+              type="date"
+              value={rangeEndValue}
+              onChange={(e) => {
+                const [y, m, d] = e.target.value.split('-').map(Number);
+                if (y && m && d) push({ mode: 'range', endYear: y, endMonth: m, endDay: d });
+              }}
+              className="bg-transparent outline-none [color-scheme:dark]"
+            />
+          </label>
+        </>
+      )}
+
+      {filter.mode === 'month' && (
         <label className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)]">
           <CalendarDays size={14} className="text-[var(--accent-bright)]" />
           <input
