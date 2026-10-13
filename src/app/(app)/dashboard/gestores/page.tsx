@@ -40,6 +40,7 @@ export default async function GestoresPage({
         porHoraAsignacion={data.porHoraAsignacion}
         allRows={cleanRows}
         defaultDay={{ year: filter.year, month: filter.month, day: filter.day }}
+        pageFilter={filter}
       />
     </div>
   );

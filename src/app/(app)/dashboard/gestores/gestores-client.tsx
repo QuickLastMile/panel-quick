@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Users, UserCog, Users2, Percent, CheckCircle2, Timer, Medal } from 'lucide-react';
 import type { ServiceRow } from '@/lib/sheets';
 import type { GestorStat, DiaSemanaPoint } from '@/lib/aggregate';
-import type { SimpleDate } from '@/lib/date-filter';
+import type { SimpleDate, DateFilter } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import type { TipoAsignadorTrend } from '@/lib/aggregate';
 import StatCard from '@/components/stat-card';
@@ -48,6 +48,7 @@ export default function GestoresClient({
   porHoraAsignacion,
   allRows,
   defaultDay,
+  pageFilter,
 }: {
   gestorStats: GestorStat[];
   porTipoAsignador: { key: string; count: number }[];
@@ -56,6 +57,7 @@ export default function GestoresClient({
   porHoraAsignacion: { hora: number; tipo: string; count: number }[];
   allRows: ServiceRow[];
   defaultDay: SimpleDate;
+  pageFilter: DateFilter;
 }) {
   const [fGestor, setFGestor] = useState('');
   const [openGestor, setOpenGestor] = useState<string | null>(null);
@@ -348,10 +350,10 @@ export default function GestoresClient({
 
       <ChartCard
         title="Tendencia diaria — Agilizador vs. Administrativo"
-        description="Histórico completo, independiente del filtro de día — filtra por mes desde aquí."
+        description="Filtra por tipo (agilizador/administrativo/otro) y por mes. Si arriba usas el filtro en modo Rango, esa gráfica se acota a ese rango."
         className="mb-5"
       >
-        <AsignadorDiaTrendChart diaTipo={asignadorTrend.diaTipo} />
+        <AsignadorDiaTrendChart diaTipo={asignadorTrend.diaTipo} pageFilter={pageFilter} />
       </ChartCard>
 
       <ChartCard
