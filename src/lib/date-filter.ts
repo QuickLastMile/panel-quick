@@ -74,7 +74,11 @@ export function isToday(filter: DateFilter): boolean {
   return filter.mode === 'day' && filter.year === today.year && filter.month === today.month && filter.day === today.day;
 }
 
-export function filterRowsByDate(rows: ServiceRow[], filter: DateFilter): ServiceRow[] {
+// Versión genérica: filtra cualquier lista de filas por un campo de fecha
+// "D/M/AAAA" indicado por `getFecha` — reutilizable fuera de ServiceRow
+// (ej. VinculacionRow del Sheet de Onboarding, que usa FECHA VINCULACION
+// en vez de FECHA SOLICITUD).
+export function filterRowsByDateField<T>(rows: T[], filter: DateFilter, getFecha: (row: T) => string): T[] {
   if (filter.mode === 'range') {
     const startKey = dateKey({ year: filter.year, month: filter.month, day: filter.day });
     const endKey = dateKey({
@@ -85,19 +89,23 @@ export function filterRowsByDate(rows: ServiceRow[], filter: DateFilter): Servic
     const lo = Math.min(startKey, endKey);
     const hi = Math.max(startKey, endKey);
     return rows.filter((r) => {
-      const f = parseFechaSolicitud(r.fechaSolicitud);
+      const f = parseFechaSolicitud(getFecha(r));
       if (!f) return false;
       const k = dateKey(f);
       return k >= lo && k <= hi;
     });
   }
   return rows.filter((r) => {
-    const f = parseFechaSolicitud(r.fechaSolicitud);
+    const f = parseFechaSolicitud(getFecha(r));
     if (!f) return false;
     if (f.year !== filter.year || f.month !== filter.month) return false;
     if (filter.mode === 'day' && f.day !== filter.day) return false;
     return true;
   });
+}
+
+export function filterRowsByDate(rows: ServiceRow[], filter: DateFilter): ServiceRow[] {
+  return filterRowsByDateField(rows, filter, (r) => r.fechaSolicitud);
 }
 
 const MONTH_NAMES = [

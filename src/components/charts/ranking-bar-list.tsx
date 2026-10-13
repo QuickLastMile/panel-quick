@@ -34,7 +34,7 @@ export default function RankingBarList({
           key={item.key}
           className={`grid grid-cols-[minmax(0,1fr)_42px] items-center gap-3 ${showPercent ? 'sm:grid-cols-[210px_1fr_90px]' : 'sm:grid-cols-[210px_1fr_42px]'}`}
         >
-          <span className="text-xs font-medium leading-tight text-[var(--text-secondary)]" title={item.key}>
+          <span className="truncate text-xs font-medium leading-tight text-[var(--text-secondary)]" title={item.key}>
             {item.key}
           </span>
           <div className="col-span-2 h-4 overflow-hidden rounded bg-[var(--surface-sunken)] sm:col-span-1">

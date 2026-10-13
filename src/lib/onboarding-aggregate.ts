@@ -75,3 +75,36 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
     mesVinculacion,
   };
 }
+
+export type OnboardingKpis = {
+  vinculadosHoy: number;
+  promedioPorDia: number;
+  ciudadTop: { key: string; count: number } | null;
+};
+
+// Histórico completo (no el filtro de día de la página) — "hoy", el
+// promedio diario y la ciudad top son indicadores de contexto general, no
+// del período que esté mirando la supervisora en ese momento.
+export function buildOnboardingKpis(allRows: VinculacionRow[], today: { year: number; month: number; day: number }): OnboardingKpis {
+  const diasSet = new Set<string>();
+  const porCiudadMap: Record<string, number> = {};
+  let vinculadosHoy = 0;
+  let validCount = 0;
+
+  allRows.forEach((r) => {
+    const fecha = parseFechaSolicitud(r.fechaVinculacion);
+    if (!fecha) return;
+    validCount += 1;
+    diasSet.add(`${fecha.year}-${pad2(fecha.month)}-${pad2(fecha.day)}`);
+    if (fecha.year === today.year && fecha.month === today.month && fecha.day === today.day) vinculadosHoy += 1;
+    if (r.ciudad) bump(porCiudadMap, r.ciudad);
+  });
+
+  const ciudadTopEntry = Object.entries(porCiudadMap).sort((a, b) => b[1] - a[1])[0];
+
+  return {
+    vinculadosHoy,
+    promedioPorDia: diasSet.size ? validCount / diasSet.size : 0,
+    ciudadTop: ciudadTopEntry ? { key: ciudadTopEntry[0], count: ciudadTopEntry[1] } : null,
+  };
+}
