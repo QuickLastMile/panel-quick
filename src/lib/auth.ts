@@ -18,11 +18,19 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/gestores',
     '/dashboard/mensajeros',
     '/dashboard/directorio',
+    '/dashboard/onboarding',
     '/admin/configuracion',
     '/admin/configuracion/historial',
     '/admin/configuracion/usuarios',
   ],
-  supervisor: ['/dashboard', '/dashboard/gestion', '/dashboard/gestores', '/dashboard/mensajeros', '/dashboard/directorio'],
+  supervisor: [
+    '/dashboard',
+    '/dashboard/gestion',
+    '/dashboard/gestores',
+    '/dashboard/mensajeros',
+    '/dashboard/directorio',
+    '/dashboard/onboarding',
+  ],
   coordinador: ['/dashboard'],
 };
 
