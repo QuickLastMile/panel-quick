@@ -32,7 +32,13 @@ const CONDUCTOR_COLS: Col[] = [
 
 function columnsFor(group: string): Col[] {
   if (group === 'Asignado' || group === 'En Tránsito' || group === 'Finalizado') return [...BASE_COLS, ...CONDUCTOR_COLS];
-  if (group === 'Cancelado') return [...BASE_COLS, ...CONDUCTOR_COLS, { key: 'razonCancelacion', label: 'Motivo', width: 180 }];
+  if (group === 'Cancelado')
+    return [
+      ...BASE_COLS,
+      ...CONDUCTOR_COLS,
+      { key: 'razonCancelacion', label: 'Motivo', width: 180 },
+      { key: 'usuarioCancelacion', label: 'Canceló', width: 200 },
+    ];
   return BASE_COLS;
 }
 

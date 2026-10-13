@@ -119,6 +119,7 @@ export default function ServiceDetailPanel({ row, onClose }: { row: ServiceRow |
           {tieneCancelacion && (
             <Section title="Cancelación">
               <Field label="Razón de cancelación" value={row.razonCancelacion} />
+              <Field label="Canceló" value={row.usuarioCancelacion} />
               <div className="col-span-2 sm:col-span-2">
                 <Field label="Descripción de cancelación" value={row.descCancelacion} />
               </div>

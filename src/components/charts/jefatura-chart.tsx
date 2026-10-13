@@ -80,7 +80,7 @@ export default function JefaturaChart({
         </div>
       )}
       {items.length ? (
-        <RankingBarList items={items} />
+        <RankingBarList items={items} showPercent />
       ) : (
         <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para este filtro.</p>
       )}

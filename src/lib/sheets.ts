@@ -15,6 +15,8 @@ export type ServiceRow = {
   placa: string;
   razonCancelacion: string;
   descCancelacion: string;
+  // Quién canceló el servicio (usuario de Quick) — vacío si no se canceló.
+  usuarioCancelacion: string;
   diaSolicitud: number | null;
   anioSolicitud: number | null;
   mesNumSolicitud: number | null;
@@ -101,6 +103,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     placa: idx('Placa'),
     razonCancelacion: idx('Razon de Cancelacion'),
     descCancelacion: idx('Descripcion de Cancelacion'),
+    usuarioCancelacion: idx('Usuario Cancelación'),
     diaSolicitud: idx('DÍA SOLICITUD'),
     anioSolicitud: idx('AÑO SOLICITUD'),
     mesNumSolicitud: idx('MES # SOLICITUD'),
@@ -145,6 +148,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       placa: String(get(row, COLS.placa) || '').trim(),
       razonCancelacion: String(get(row, COLS.razonCancelacion) || ''),
       descCancelacion: String(get(row, COLS.descCancelacion) || ''),
+      usuarioCancelacion: String(get(row, COLS.usuarioCancelacion) || ''),
       diaSolicitud: Number(get(row, COLS.diaSolicitud)) || null,
       anioSolicitud: Number(get(row, COLS.anioSolicitud)) || null,
       mesNumSolicitud: Number(get(row, COLS.mesNumSolicitud)) || null,

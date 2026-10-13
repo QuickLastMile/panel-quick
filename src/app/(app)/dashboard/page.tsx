@@ -56,7 +56,7 @@ export default async function ResumenPage({
   return (
     <div>
       <PageHeader
-        eyebrow="Resumen operativo"
+        eyebrow="Reporte general"
         title="Servicios de"
         accent={`solicitud — ${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}`}
         asOf={`Última sincronización: ${syncLabel} · ${data.totalServicios.toLocaleString('es-CO')} servicios`}
@@ -114,14 +114,14 @@ export default async function ResumenPage({
       <div className="mb-5 grid gap-5 md:grid-cols-2">
         <ChartCard title="Servicios por tipo de jornada" description='Columna "Servicio" — Vuelta / Día / Medio día'>
           {data.porServicio.length ? (
-            <RankingBarList items={data.porServicio} />
+            <RankingBarList items={data.porServicio} showPercent />
           ) : (
             <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
           )}
         </ChartCard>
         <ChartCard title="Servicios por tipo de vehículo" description='Columna "Tipo de Servicio" — Mensajería (incluye Domicilio) / Carry'>
           {data.porTipoServicio.length ? (
-            <RankingBarList items={data.porTipoServicio} />
+            <RankingBarList items={data.porTipoServicio} showPercent />
           ) : (
             <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin servicios para esta fecha.</p>
           )}

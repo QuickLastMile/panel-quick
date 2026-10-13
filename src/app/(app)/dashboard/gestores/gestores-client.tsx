@@ -10,7 +10,7 @@ import type { TipoAsignadorTrend } from '@/lib/aggregate';
 import StatCard from '@/components/stat-card';
 import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
-import TrendLineChart from '@/components/charts/trend-line-chart';
+import MultiTrendLineChart from '@/components/charts/multi-trend-line-chart';
 import AsignadorMesChart from '@/components/charts/asignador-mes-chart';
 import AsignadorDiaTrendChart from '@/components/charts/asignador-dia-trend-chart';
 import DiaSemanaChart from '@/components/charts/dia-semana-chart';
@@ -22,6 +22,11 @@ const TIPO_ASIGNADOR_LABEL: Record<string, string> = {
   AGILIZADOR: 'Agilizador',
   COORDINADOR: 'Administrativo (Coordinador)',
   OTRO: 'Otro / externo',
+};
+
+const TIPO_ASIGNADOR_COLOR: Record<string, string> = {
+  AGILIZADOR: '#f3c94f',
+  COORDINADOR: '#4f9df5',
 };
 
 // Formato militar HH:MM:SS para cualquier duración/tiempo promedio — se
@@ -48,7 +53,7 @@ export default function GestoresClient({
   porTipoAsignador: { key: string; count: number }[];
   asignadorTrend: TipoAsignadorTrend;
   diaSemana: DiaSemanaPoint[];
-  porHoraAsignacion: { hora: number; count: number }[];
+  porHoraAsignacion: { hora: number; tipo: string; count: number }[];
   allRows: ServiceRow[];
   defaultDay: SimpleDate;
 }) {
@@ -93,6 +98,14 @@ export default function GestoresClient({
     return count ? sum / count : null;
   }, [filteredStats]);
 
+  // Tiempo promedio de colocación (desde que se asignó hasta la hora
+  // programada del servicio) — mismo patrón sum/count crudos.
+  const tiempoPromedioColocacion = useMemo(() => {
+    const sum = filteredStats.reduce((s, g) => s + g.minutosColocacionSum, 0);
+    const count = filteredStats.reduce((s, g) => s + g.minutosColocacionCount, 0);
+    return count ? sum / count : null;
+  }, [filteredStats]);
+
   // Censo de PERSONAS (no de servicios): cuántos gestores distintos son
   // agilizador / administrativo / otro (vacaciones + supervisor), excluyendo
   // "Agilizador no asignado" (es un relleno, no una persona real).
@@ -122,15 +135,25 @@ export default function GestoresClient({
     };
   }, [filteredStats]);
 
-  // Recorta las horas sin ningún dato al inicio/fin (ej. de madrugada) —
-  // conserva huecos en medio, solo quita los bordes vacíos.
-  const horaAsignacionPoints = useMemo(() => {
-    const first = porHoraAsignacion.findIndex((p) => p.count > 0);
-    const last = porHoraAsignacion.length - 1 - [...porHoraAsignacion].reverse().findIndex((p) => p.count > 0);
+  // Series "Agilizador" / "Administrativo" por hora (0-23), recortando las
+  // horas sin NINGÚN dato (en ninguna de las dos series) al inicio/fin.
+  const horaAsignacionSeries = useMemo(() => {
+    const TIPOS = ['AGILIZADOR', 'COORDINADOR'];
+    const byTipoHora: Record<string, number> = {};
+    porHoraAsignacion.forEach((p) => {
+      byTipoHora[`${p.hora}|||${p.tipo}`] = p.count;
+    });
+    const totalPorHora = Array.from({ length: 24 }, (_, h) => TIPOS.reduce((s, t) => s + (byTipoHora[`${h}|||${t}`] || 0), 0));
+    const first = totalPorHora.findIndex((c) => c > 0);
+    const last = totalPorHora.length - 1 - [...totalPorHora].reverse().findIndex((c) => c > 0);
     if (first === -1) return [];
-    return porHoraAsignacion
-      .slice(first, last + 1)
-      .map((p) => ({ label: `${String(p.hora).padStart(2, '0')}:00`, value: p.count }));
+    const horas = Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    return TIPOS.map((tipo) => ({
+      key: tipo,
+      label: TIPO_ASIGNADOR_LABEL[tipo],
+      color: TIPO_ASIGNADOR_COLOR[tipo],
+      points: horas.map((h) => ({ label: `${String(h).padStart(2, '0')}:00`, value: byTipoHora[`${h}|||${tipo}`] || 0 })),
+    }));
   }, [porHoraAsignacion]);
 
   const gestorChartItems = useMemo(() => {
@@ -190,6 +213,13 @@ export default function GestoresClient({
           iconColor="#e2574c"
           sub="Desde creación hasta asignación"
         />
+        <StatCard
+          label="Tiempo prom. colocación"
+          value={tiempoPromedioColocacion !== null ? formatDuracionHMS(tiempoPromedioColocacion) : '—'}
+          icon={Timer}
+          iconColor="#e2574c"
+          sub="Desde asignación hasta la hora del servicio"
+        />
         <StatCard label="Asignado por agiliz." value={`${asignadorPorTipo.pctAgilizador}%`} icon={Percent} iconColor="#f3c94f" sub={`${asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios`} />
         <StatCard label="Asignado por admin." value={`${asignadorPorTipo.pctCoordinador}%`} icon={Percent} iconColor="#4f9df5" sub={`${asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios`} />
         <StatCard label="Efectividad" value={`${efectividad}%`} icon={CheckCircle2} iconColor={STATUS_COLOR['Finalizado']} sub="Asignado + En tránsito + Finalizado / total" />
@@ -197,10 +227,10 @@ export default function GestoresClient({
 
       <ChartCard
         title="Asignaciones por franja horaria"
-        description='Columna "HORA ASIGNACIÓN" — a qué hora se asignan más servicios. Usa el filtro de fecha de arriba.'
+        description='Columna "HORA ASIGNACIÓN" — separado por agilizador y administrativo. Usa el filtro de fecha de arriba.'
         className="mb-5"
       >
-        <TrendLineChart points={horaAsignacionPoints} emptyMessage="Sin asignaciones para esta fecha." />
+        <MultiTrendLineChart series={horaAsignacionSeries} emptyMessage="Sin asignaciones para esta fecha." />
       </ChartCard>
 
       <ChartCard

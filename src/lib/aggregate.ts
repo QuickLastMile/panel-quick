@@ -1,4 +1,5 @@
 import type { ServiceRow } from './sheets';
+import { parseFechaSolicitud } from './date-filter';
 
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
 const TERMINAL = new Set(['Finalizado', 'Cancelado']);
@@ -29,6 +30,24 @@ export function normEstado(estado: string): string {
 
 function bump(map: Record<string, number>, key: string) {
   map[key] = (map[key] || 0) + 1;
+}
+
+// Minutos entre el momento en que se asignó el servicio (Fecha Hora
+// Asignado) y la hora programada del servicio (FECHA SOLICITUD + HORA DE
+// SERVICIO) — "tiempo de colocación". Null si falta algún dato, no es
+// parseable, o el resultado es negativo (el servicio quedó antes de la
+// asignación — no tiene sentido como tiempo de colocación, es ruido).
+function computeMinutosColocacion(r: ServiceRow): number | null {
+  if (!r.fechaHoraAsignado || !r.horaServicio || !r.fechaSolicitud) return null;
+  const servicioDate = parseFechaSolicitud(r.fechaSolicitud);
+  if (!servicioDate) return null;
+  const [hh, mm, ss] = r.horaServicio.split(':').map(Number);
+  if (!Number.isFinite(hh)) return null;
+  const servicioMs = Date.UTC(servicioDate.year, servicioDate.month - 1, servicioDate.day, hh || 0, mm || 0, ss || 0);
+  const asignadoMs = Date.parse(`${r.fechaHoraAsignado.replace(' ', 'T')}Z`);
+  if (!Number.isFinite(asignadoMs)) return null;
+  const diffMin = (servicioMs - asignadoMs) / 60000;
+  return diffMin >= 0 ? diffMin : null;
 }
 
 // Quick a veces guarda el mismo motivo repetido y concatenado con "-" (ej.
@@ -68,6 +87,10 @@ export type GestorStat = {
   // entre varios gestores sin promediar promedios.
   minutosAsignacionSum: number;
   minutosAsignacionCount: number;
+  // Tiempo de colocación: Fecha Hora Asignado -> FECHA SOLICITUD + HORA DE
+  // SERVICIO. Mismo patrón de sum/count crudos.
+  minutosColocacionSum: number;
+  minutosColocacionCount: number;
 };
 
 export type DashboardData = {
@@ -85,7 +108,7 @@ export type DashboardData = {
   porTipoAsignador: { key: string; count: number }[];
   porJefatura: { key: string; count: number }[];
   porMotivoCancelacion: { key: string; count: number }[];
-  porHoraAsignacion: { hora: number; count: number }[];
+  porHoraAsignacion: { hora: number; tipo: string; count: number }[];
   gestorStats: GestorStat[];
 };
 
@@ -279,15 +302,21 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
 
   // "00:00:00" es el valor de relleno de Quick cuando nunca se asignó — se
   // distingue de una asignación real a medianoche usando fechaHoraAsignado
-  // (vacío si nunca se asignó).
-  const porHoraAsignacionMap: Record<number, number> = {};
+  // (vacío si nunca se asignó). Se separa por tipoAsignador (AGILIZADOR /
+  // COORDINADOR / OTRO) para poder comparar a qué hora asigna cada quién.
+  const porHoraAsignacionMap: Record<string, number> = {};
   rows.forEach((r) => {
     if (!r.fechaHoraAsignado) return;
     const h = parseHour(r.horaAsignacion);
     if (h === null) return;
-    porHoraAsignacionMap[h] = (porHoraAsignacionMap[h] || 0) + 1;
+    if (!r.tipoAsignador || EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) return;
+    const key = `${h}|||${r.tipoAsignador}`;
+    porHoraAsignacionMap[key] = (porHoraAsignacionMap[key] || 0) + 1;
   });
-  const porHoraAsignacion = Array.from({ length: 24 }, (_, hora) => ({ hora, count: porHoraAsignacionMap[hora] || 0 }));
+  const porHoraAsignacion = Object.entries(porHoraAsignacionMap).map(([k, count]) => {
+    const [hora, tipo] = k.split('|||');
+    return { hora: Number(hora), tipo, count };
+  });
 
   const porGestor: Record<
     string,
@@ -301,6 +330,8 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
       enTransito: number;
       minutosAsignacionSum: number;
       minutosAsignacionCount: number;
+      minutosColocacionSum: number;
+      minutosColocacionCount: number;
     }
   > = {};
   rows.forEach((r) => {
@@ -317,6 +348,8 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
         enTransito: 0,
         minutosAsignacionSum: 0,
         minutosAsignacionCount: 0,
+        minutosColocacionSum: 0,
+        minutosColocacionCount: 0,
       };
     }
     const entry = porGestor[g];
@@ -330,6 +363,11 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     if (r.minutosAsignacion != null) {
       entry.minutosAsignacionSum += r.minutosAsignacion;
       entry.minutosAsignacionCount += 1;
+    }
+    const minutosColocacion = computeMinutosColocacion(r);
+    if (minutosColocacion != null) {
+      entry.minutosColocacionSum += minutosColocacion;
+      entry.minutosColocacionCount += 1;
     }
   });
 
@@ -346,6 +384,8 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
       enTransito: v.enTransito,
       minutosAsignacionSum: v.minutosAsignacionSum,
       minutosAsignacionCount: v.minutosAsignacionCount,
+      minutosColocacionSum: v.minutosColocacionSum,
+      minutosColocacionCount: v.minutosColocacionCount,
     }))
     .sort((a, b) => b.total - a.total);
 
