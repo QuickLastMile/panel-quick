@@ -1,5 +1,4 @@
 import { getOnboardingSnapshot } from '@/lib/onboarding';
-import { getSheetsSnapshot } from '@/lib/sheets';
 import { buildOnboardingKpis, buildAgilizadorMeta } from '@/lib/onboarding-aggregate';
 import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, formatMonthLabel, isToday, bogotaToday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
@@ -18,7 +17,7 @@ export default async function OnboardingPage({
   await requireRole(['admin', 'supervisor']);
   const filter = parseDateFilterParams(await searchParams);
 
-  const [{ rows: allRows }, { rows: serviceRows }] = await Promise.all([getOnboardingSnapshot(), getSheetsSnapshot()]);
+  const { rows: allRows } = await getOnboardingSnapshot();
 
   const rows = filterRowsByDateField(allRows, filter, (r) => r.fechaVinculacion);
   const today = bogotaToday();
@@ -45,7 +44,6 @@ export default async function OnboardingPage({
       <OnboardingClient
         rows={rows}
         allRows={allRows}
-        serviceRows={serviceRows}
         kpis={kpis}
         zamirMeta={zamirMeta}
         isFilteredToday={isToday(filter)}

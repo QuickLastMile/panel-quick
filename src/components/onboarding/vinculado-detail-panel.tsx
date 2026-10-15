@@ -9,6 +9,7 @@ import { normEstado } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import StatusPill from '@/components/status-pill';
 import ServiceDetailPanel from '@/components/service-detail-panel';
+import { getServiciosDeVinculado } from '@/app/(app)/dashboard/onboarding/actions';
 
 function RowsTable({ rows, onSelect }: { rows: ServiceRow[]; onSelect: (row: ServiceRow) => void }) {
   if (rows.length === 0) {
@@ -53,20 +54,36 @@ function RowsTable({ rows, onSelect }: { rows: ServiceRow[]; onSelect: (row: Ser
 
 export default function VinculadoDetailPanel({
   vinculado,
-  serviceRows,
   onClose,
 }: {
   vinculado: VinculacionRow | null;
-  serviceRows: ServiceRow[];
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ServiceRow | null>(null);
+  const [servicios, setServicios] = useState<ServiceRow[]>([]);
+  const [loadingServicios, setLoadingServicios] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
+  // Se trae solo cuando se abre un vinculado puntual — evita mandar las
+  // 28k+ filas de Datos_Actuales al cliente en cada carga de la página.
   useEffect(() => {
-    if (vinculado) setSelectedRow(null);
+    if (!vinculado) return;
+    setSelectedRow(null);
+    setServicios([]);
+    setLoadingServicios(true);
+    let cancelled = false;
+    getServiciosDeVinculado(vinculado.identificacion)
+      .then((rows) => {
+        if (!cancelled) setServicios(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingServicios(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [vinculado]);
 
   useEffect(() => {
@@ -85,16 +102,6 @@ export default function VinculadoDetailPanel({
       document.body.style.overflow = prevBody;
     };
   }, [vinculado, onClose]);
-
-  // Cruce por IDENTIFICACIÓN (Onboarding) == Ident. Trabajador (Datos_Actuales).
-  const servicios = useMemo(() => {
-    if (!vinculado) return [];
-    const ident = vinculado.identificacion.trim();
-    if (!ident) return [];
-    return serviceRows
-      .filter((r) => r.identTrabajador.trim() === ident)
-      .sort((a, b) => b.fechaSolicitud.localeCompare(a.fechaSolicitud));
-  }, [serviceRows, vinculado]);
 
   const stats = useMemo(() => {
     let finalizados = 0;
@@ -188,7 +195,11 @@ export default function VinculadoDetailPanel({
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--accent-bright)]">
               Servicios realizados ({servicios.length})
             </h3>
-            <RowsTable rows={servicios} onSelect={setSelectedRow} />
+            {loadingServicios ? (
+              <p className="py-8 text-center text-sm text-[var(--text-muted)]">Cargando servicios…</p>
+            ) : (
+              <RowsTable rows={servicios} onSelect={setSelectedRow} />
+            )}
           </div>
         </div>
       </div>

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { Users, CalendarCheck, TrendingUp, MapPin, Target, Award } from 'lucide-react';
-import type { ServiceRow } from '@/lib/sheets';
 import type { VinculacionRow } from '@/lib/onboarding';
 import { buildOnboardingData, type AgilizadorMeta, type OnboardingKpis } from '@/lib/onboarding-aggregate';
 import StatCard from '@/components/stat-card';
@@ -22,7 +21,6 @@ const GESTION_LABEL: Record<string, string> = {
 export default function OnboardingClient({
   rows,
   allRows,
-  serviceRows,
   kpis,
   zamirMeta,
   isFilteredToday,
@@ -34,8 +32,6 @@ export default function OnboardingClient({
   rows: VinculacionRow[];
   // Histórico completo — para gráficas de mes/día y la meta de Zamir.
   allRows: VinculacionRow[];
-  // Datos_Actuales completo — para el cruce del panel de detalle.
-  serviceRows: ServiceRow[];
   kpis: OnboardingKpis;
   zamirMeta: AgilizadorMeta;
   isFilteredToday: boolean;
@@ -231,7 +227,7 @@ export default function OnboardingClient({
 
       <VinculadosTable rows={scopedRows} allRows={scopedAllRows} onSelect={setSelected} />
 
-      <VinculadoDetailPanel vinculado={selected} serviceRows={serviceRows} onClose={() => setSelected(null)} />
+      <VinculadoDetailPanel vinculado={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
