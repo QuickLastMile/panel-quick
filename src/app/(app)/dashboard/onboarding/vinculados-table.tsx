@@ -29,6 +29,7 @@ const COLS: Col[] = [
   { key: 'cantFinalizadosNovedad', label: 'Con novedad' },
   { key: 'totalGestiones', label: 'Total gestiones' },
   { key: 'ultimoEstado', label: 'Último estado' },
+  { key: 'observacionNoPrestacion', label: 'Observación no prestación' },
 ];
 
 function distinct(rows: VinculacionRow[], key: keyof VinculacionRow): string[] {

@@ -29,9 +29,18 @@ export type OnboardingData = {
   porGestionStatus: { key: string; count: number }[];
   gestionaron: number;
   sinGestion: number;
+  // % de gestionaron sobre el total (gestionaron + sin gestión).
+  gestionPct: number;
 };
 
 const SIN_GESTION = 'SIN GESTIÓN';
+const ACTIVO_STATUS = 'ACTIVO';
+
+// "ESTADO DEL WORKER" tal cual lo escribe Quick — se compara normalizado
+// para no depender de mayúsculas/espacios sueltos en el Sheet.
+export function isActivoWorker(estadoWorker: string): boolean {
+  return estadoWorker.trim().toUpperCase() === ACTIVO_STATUS;
+}
 
 export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
   const porAgilizadorMap: Record<string, number> = {};
@@ -90,6 +99,7 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
     porGestionStatus: toPairs(porGestionStatusMap),
     gestionaron,
     sinGestion,
+    gestionPct: gestionaron + sinGestion ? Math.round((gestionaron / (gestionaron + sinGestion)) * 1000) / 10 : 0,
   };
 }
 
@@ -141,10 +151,14 @@ export type AgilizadorMeta = {
 // Seguimiento de meta para un agilizador puntual (ej. "ZAMIR ANDRES ARCIA"):
 // meta diaria y mensual de vinculaciones, y qué tan efectivas resultaron
 // (cuántos de sus vinculados ya están gestionando vs. siguen sin gestión).
+// `dayRef` y `monthRef` son independientes (el bloque de Zamir trae sus
+// propios filtros de día y de mes, desconectados entre sí y del filtro
+// general de la página).
 export function buildAgilizadorMeta(
   allRows: VinculacionRow[],
   nombreAgilizador: string,
-  today: { year: number; month: number; day: number },
+  dayRef: { year: number; month: number; day: number },
+  monthRef: { year: number; month: number } = dayRef,
   metaDiaria = 5,
   metaMensual = 130
 ): AgilizadorMeta {
@@ -158,8 +172,8 @@ export function buildAgilizadorMeta(
   suyos.forEach((r) => {
     const fecha = parseFechaSolicitud(r.fechaVinculacion);
     if (fecha) {
-      if (fecha.year === today.year && fecha.month === today.month && fecha.day === today.day) vinculadosHoy += 1;
-      if (fecha.year === today.year && fecha.month === today.month) vinculadosMes += 1;
+      if (fecha.year === dayRef.year && fecha.month === dayRef.month && fecha.day === dayRef.day) vinculadosHoy += 1;
+      if (fecha.year === monthRef.year && fecha.month === monthRef.month) vinculadosMes += 1;
     }
     if ((r.gestionStatus || SIN_GESTION) !== SIN_GESTION) gestionaron += 1;
   });

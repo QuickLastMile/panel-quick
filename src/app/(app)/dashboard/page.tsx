@@ -1,11 +1,21 @@
 import { Package, Clock, UserCheck, Truck, RotateCcw, CheckCircle2, XCircle } from 'lucide-react';
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData, buildTrendData, buildJefaturaTrend, listJefaturas, filterRowsByJefatura, findDobleAsignacion } from '@/lib/aggregate';
+import {
+  buildDashboardData,
+  buildTrendData,
+  buildJefaturaTrend,
+  listJefaturas,
+  filterRowsByJefatura,
+  listProyectos,
+  filterRowsByProyecto,
+  findDobleAsignacion,
+} from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
 import JefaturaTabs from '@/components/jefatura-tabs';
+import ProyectoFilter from '@/components/proyecto-filter';
 import StatCard from '@/components/stat-card';
 import ChartCard from '@/components/charts/chart-card';
 import StackedBarList from '@/components/charts/stacked-bar-list';
@@ -34,21 +44,23 @@ export default async function ResumenPage({
   const sp = await searchParams;
   const filter = parseDateFilterParams(sp);
   const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
+  const proyectoParam = typeof sp.proyecto === 'string' ? sp.proyecto : '';
 
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const jefaturas = listJefaturas(allRows);
+  const proyectos = listProyectos(allRows);
 
-  const jefaturaRows = filterRowsByJefatura(allRows, jefaturaParam);
-  const rows = filterRowsByDate(jefaturaRows, filter);
+  const scopedRows = filterRowsByProyecto(filterRowsByJefatura(allRows, jefaturaParam), proyectoParam);
+  const rows = filterRowsByDate(scopedRows, filter);
   const data = buildDashboardData(rows);
   // Mes y tendencia por día se calculan sobre el histórico completo (solo
-  // acotado por jefatura), a propósito desacoplados del filtro de día/mes de
-  // la página — cada uno trae su propio filtro de proyecto/mes.
-  const trend = buildTrendData(jefaturaRows);
-  const jefaturaTrend = buildJefaturaTrend(jefaturaRows);
+  // acotado por jefatura/proyecto), a propósito desacoplados del filtro de
+  // día/mes de la página — cada uno trae su propio filtro de proyecto/mes.
+  const trend = buildTrendData(scopedRows);
+  const jefaturaTrend = buildJefaturaTrend(scopedRows);
   // Independiente del filtro de día — una asignación doble es un problema
   // sin importar qué día esté mirando la página ahora mismo.
-  const dobleAsignacion = findDobleAsignacion(jefaturaRows);
+  const dobleAsignacion = findDobleAsignacion(scopedRows);
 
   const byEstado = Object.fromEntries(data.porEstado.map((e) => [e.key, e.count]));
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
@@ -63,6 +75,7 @@ export default async function ResumenPage({
       />
 
       <JefaturaTabs jefaturas={jefaturas} selected={jefaturaParam} />
+      <ProyectoFilter proyectos={proyectos} selected={proyectoParam} />
       <DobleAsignacionAlert items={dobleAsignacion} />
       <DateFilterBar filter={filter} />
 
@@ -75,6 +88,11 @@ export default async function ResumenPage({
             value={(byEstado[st] || 0).toLocaleString('es-CO')}
             icon={STATUS_ICON[st]}
             iconColor={STATUS_COLOR[st]}
+            sub={
+              data.totalServicios
+                ? `${(Math.round(((byEstado[st] || 0) / data.totalServicios) * 1000) / 10).toLocaleString('es-CO')}%`
+                : undefined
+            }
           />
         ))}
       </div>

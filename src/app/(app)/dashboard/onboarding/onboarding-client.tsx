@@ -1,15 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Users, CalendarCheck, TrendingUp, MapPin, Target, Award } from 'lucide-react';
+import { Users, CalendarCheck, TrendingUp, MapPin, Target, Award, Percent } from 'lucide-react';
 import type { VinculacionRow } from '@/lib/onboarding';
-import { buildOnboardingData, type AgilizadorMeta, type OnboardingKpis } from '@/lib/onboarding-aggregate';
+import { buildOnboardingData, buildAgilizadorMeta, isActivoWorker, type OnboardingKpis } from '@/lib/onboarding-aggregate';
+import { bogotaToday, bogotaYesterday, formatMonthLabel } from '@/lib/date-filter';
 import StatCard from '@/components/stat-card';
 import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
 import BarTrendChart from '@/components/charts/bar-trend-chart';
 import TrendLineChart from '@/components/charts/trend-line-chart';
 import VinculadosTable from './vinculados-table';
+import InactivosTable from './inactivos-table';
 import VinculadoDetailPanel from '@/components/onboarding/vinculado-detail-panel';
 
 const GESTION_LABEL: Record<string, string> = {
@@ -22,26 +24,40 @@ export default function OnboardingClient({
   rows,
   allRows,
   kpis,
-  zamirMeta,
+  agilizadorSeguimiento,
   isFilteredToday,
   filterLabel,
-  isReferenceMonthCurrent,
-  referenceMonthLabel,
 }: {
   // Vinculados según el filtro de fecha de arriba (Día/Rango/Mes).
   rows: VinculacionRow[];
   // Histórico completo — para gráficas de mes/día y la meta de Zamir.
   allRows: VinculacionRow[];
   kpis: OnboardingKpis;
-  zamirMeta: AgilizadorMeta;
+  agilizadorSeguimiento: string;
   isFilteredToday: boolean;
   filterLabel: string;
-  // Mes del día seleccionado en el filtro — para la meta mensual de Zamir.
-  isReferenceMonthCurrent: boolean;
-  referenceMonthLabel: string;
 }) {
   const [fAgilizador, setFAgilizador] = useState('');
   const [selected, setSelected] = useState<VinculacionRow | null>(null);
+
+  // Filtros propios del bloque "Meta de vinculación" — desconectados del
+  // filtro general de la página y entre sí (día para "Hoy", mes para "Este
+  // mes"). Arranca igual que el resto de la pestaña: día = ayer, mes = el
+  // mes real en curso.
+  const todayReal = bogotaToday();
+  const [zDay, setZDay] = useState(bogotaYesterday());
+  const [zMonth, setZMonth] = useState({ year: todayReal.year, month: todayReal.month });
+  const isZDayToday = zDay.year === todayReal.year && zDay.month === todayReal.month && zDay.day === todayReal.day;
+  const isZMonthCurrent = zMonth.year === todayReal.year && zMonth.month === todayReal.month;
+
+  // La meta de Zamir es un seguimiento puntual a esa persona — siempre
+  // sobre el histórico completo sin acotar, nunca por el filtro de
+  // agilizador de la página (si no, al filtrar por otro agilizador se
+  // vería vacía).
+  const zamirMeta = useMemo(
+    () => buildAgilizadorMeta(allRows, agilizadorSeguimiento, zDay, zMonth),
+    [allRows, agilizadorSeguimiento, zDay, zMonth]
+  );
 
   const agilizadores = useMemo(() => {
     const set = new Set<string>();
@@ -72,6 +88,10 @@ export default function OnboardingClient({
     () => historico.porGestionStatus.map((g) => ({ key: GESTION_LABEL[g.key] || g.key, count: g.count })),
     [historico.porGestionStatus]
   );
+
+  // Inactivos: histórico completo (acotado por agilizador si hay filtro),
+  // con el motivo de inactivación que diligencia el agilizador.
+  const inactivos = useMemo(() => scopedAllRows.filter((r) => !isActivoWorker(r.estadoWorker)), [scopedAllRows]);
 
   return (
     <div>
@@ -131,30 +151,63 @@ export default function OnboardingClient({
 
       <ChartCard
         title="Meta de vinculación — Zamir Andres Arcia"
-        description="Meta: 5 vinculaciones por día / 130 al mes."
+        description="Meta: 5 vinculaciones por día / 130 al mes. Filtros propios, desconectados del filtro general de la página."
         className="mb-5"
       >
+        <div className="mb-4 flex flex-wrap items-end gap-2.5">
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Día</span>
+            <input
+              type="date"
+              value={`${zDay.year}-${String(zDay.month).padStart(2, '0')}-${String(zDay.day).padStart(2, '0')}`}
+              onChange={(e) => {
+                const [y, m, d] = e.target.value.split('-').map(Number);
+                if (y && m && d) setZDay({ year: y, month: m, day: d });
+              }}
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors [color-scheme:dark] focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Mes</span>
+            <input
+              type="month"
+              value={`${zMonth.year}-${String(zMonth.month).padStart(2, '0')}`}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-').map(Number);
+                if (y && m) setZMonth({ year: y, month: m });
+              }}
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors [color-scheme:dark] focus:border-[var(--accent)]"
+            />
+          </label>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            label={isFilteredToday ? 'Hoy' : filterLabel}
+            label={isZDayToday ? 'Hoy' : `${String(zDay.day).padStart(2, '0')}/${String(zDay.month).padStart(2, '0')}/${zDay.year}`}
             value={`${zamirMeta.vinculadosHoy} / ${zamirMeta.metaDiaria}`}
             icon={Target}
             iconColor={zamirMeta.pctDiaria >= 100 ? '#3fb950' : '#f3c94f'}
             sub={`${zamirMeta.pctDiaria}% de la meta diaria`}
           />
           <StatCard
-            label={isReferenceMonthCurrent ? 'Este mes' : referenceMonthLabel}
+            label={isZMonthCurrent ? 'Este mes' : formatMonthLabel(zMonth.year, zMonth.month)}
             value={`${zamirMeta.vinculadosMes} / ${zamirMeta.metaMensual}`}
             icon={Target}
             iconColor={zamirMeta.pctMensual >= 100 ? '#3fb950' : '#f3c94f'}
             sub={`${zamirMeta.pctMensual}% de la meta mensual`}
           />
           <StatCard
+            label="Cumplimiento mensual"
+            value={`${zamirMeta.pctMensual}%`}
+            icon={Percent}
+            iconColor={zamirMeta.pctMensual >= 100 ? '#3fb950' : '#f3c94f'}
+            sub={`${zamirMeta.vinculadosMes} de ${zamirMeta.metaMensual} vinculados`}
+          />
+          <StatCard
             label="Efectividad"
             value={`${zamirMeta.efectividadPct}%`}
             icon={Award}
             iconColor="#4f9df5"
-            sub="% de sus vinculados que ya gestionan"
+            sub="% de vinculados que gestionan"
           />
         </div>
       </ChartCard>
@@ -172,6 +225,10 @@ export default function OnboardingClient({
           <div className="panel-card rounded-xl p-4">
             <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Sin gestión</p>
             <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{historico.sinGestion}</p>
+          </div>
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">% de gestión</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{historico.gestionPct}%</p>
           </div>
         </div>
         {gestionItems.length ? (
@@ -226,6 +283,14 @@ export default function OnboardingClient({
       </ChartCard>
 
       <VinculadosTable rows={scopedRows} allRows={scopedAllRows} onSelect={setSelected} />
+
+      <div className="h-5" />
+
+      <h2 className="mb-3 text-sm font-bold text-[var(--text)]">Vinculados inactivos</h2>
+      <p className="mb-3 text-xs text-[var(--text-muted)]">
+        Vinculados en un estado distinto de "Activo" — con el motivo de inactivación que diligencia el agilizador.
+      </p>
+      <InactivosTable rows={inactivos} />
 
       <VinculadoDetailPanel vinculado={selected} onClose={() => setSelected(null)} />
     </div>

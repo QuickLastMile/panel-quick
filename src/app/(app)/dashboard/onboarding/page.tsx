@@ -1,6 +1,6 @@
 import { getOnboardingSnapshot } from '@/lib/onboarding';
-import { buildOnboardingKpis, buildAgilizadorMeta } from '@/lib/onboarding-aggregate';
-import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, formatMonthLabel, isToday, bogotaToday } from '@/lib/date-filter';
+import { buildOnboardingKpis } from '@/lib/onboarding-aggregate';
+import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, isToday, bogotaYesterday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -15,20 +15,19 @@ export default async function OnboardingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole(['admin', 'supervisor']);
-  const filter = parseDateFilterParams(await searchParams);
+  // Esta pestaña arranca en el día de AYER por defecto (no "hoy") — la data
+  // de Onboarding se actualiza con un día de rezago, así que "hoy" suele
+  // verse vacío.
+  const filter = parseDateFilterParams(await searchParams, bogotaYesterday());
 
   const { rows: allRows } = await getOnboardingSnapshot();
 
   const rows = filterRowsByDateField(allRows, filter, (r) => r.fechaVinculacion);
-  const today = bogotaToday();
-  // "Vinculados hoy" y la meta de Zamir usan el día/mes que esté
-  // seleccionado en el filtro de arriba (no siempre el día calendario real)
-  // — si filtras a un día de hace un mes, "este mes" debe reflejar ESE mes.
+  // "Vinculados [día]" usa el día/mes que esté seleccionado en el filtro de
+  // arriba (no siempre el día calendario real) — si filtras a un día de
+  // hace un mes, el KPI debe reflejar ESE día.
   const referenceDay = { year: filter.year, month: filter.month, day: filter.day };
   const kpis = buildOnboardingKpis(allRows, referenceDay);
-  const zamirMeta = buildAgilizadorMeta(allRows, AGILIZADOR_SEGUIMIENTO, referenceDay);
-  const isReferenceMonthCurrent = referenceDay.year === today.year && referenceDay.month === today.month;
-  const referenceMonthLabel = formatMonthLabel(referenceDay.year, referenceDay.month);
 
   return (
     <div>
@@ -45,11 +44,9 @@ export default async function OnboardingPage({
         rows={rows}
         allRows={allRows}
         kpis={kpis}
-        zamirMeta={zamirMeta}
+        agilizadorSeguimiento={AGILIZADOR_SEGUIMIENTO}
         isFilteredToday={isToday(filter)}
         filterLabel={formatDateFilterLabel(filter)}
-        isReferenceMonthCurrent={isReferenceMonthCurrent}
-        referenceMonthLabel={referenceMonthLabel}
       />
     </div>
   );

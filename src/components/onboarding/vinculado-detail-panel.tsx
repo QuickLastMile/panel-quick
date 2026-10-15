@@ -149,6 +149,23 @@ export default function VinculadoDetailPanel({
         </div>
 
         <div className="flex-1 space-y-5 overflow-auto p-5">
+          {(vinculado.observacionNoPrestacion || vinculado.motivoInactivacion) && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--accent-soft)] p-4">
+              {vinculado.observacionNoPrestacion && (
+                <p className="text-xs text-[var(--text)]">
+                  <span className="font-bold text-[var(--accent-bright)]">Observación de no prestación de servicio: </span>
+                  {vinculado.observacionNoPrestacion}
+                </p>
+              )}
+              {vinculado.motivoInactivacion && (
+                <p className="mt-1 text-xs text-[var(--text)]">
+                  <span className="font-bold text-[var(--accent-bright)]">Motivo de inactivación: </span>
+                  {vinculado.motivoInactivacion}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="panel-card rounded-xl p-4">
               <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Servicios acumulados</p>

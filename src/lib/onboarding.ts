@@ -1,8 +1,10 @@
 import { google } from 'googleapis';
 
 // La pestaña ONBOARDING ahora vive en el mismo Sheet de monitoreo (antes era
-// un archivo aparte) — una sola conexión, un solo service account.
-const SHEET_RANGE = 'ONBOARDING!A:V';
+// un archivo aparte) — una sola conexión, un solo service account. Ampliado
+// de A:V a A:Z para cubrir las columnas de observación/motivo de
+// inactivación que se agregaron después.
+const SHEET_RANGE = 'ONBOARDING!A:Z';
 
 export type VinculacionRow = {
   workerId: string;
@@ -27,6 +29,11 @@ export type VinculacionRow = {
   ultimoEstado: string;
   // Columna "gestión": "SIN GESTIÓN" / "PRIMER SERVICIO NO EFECTIVO" / "GESTIONANDO".
   gestionStatus: string;
+  // El agilizador la llena manualmente para los vinculados ACTIVOS que
+  // después de vinculados no han prestado ningún servicio.
+  observacionNoPrestacion: string;
+  // Solo aplica a vinculados en un estado distinto de activo.
+  motivoInactivacion: string;
 };
 
 function getAuth() {
@@ -96,6 +103,8 @@ async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
     totalGestiones: idx('TOTAL GESTIONES'),
     ultimoEstado: idx('ULTIMO ESTADO'),
     gestionStatus: lastIdx('gestión'),
+    observacionNoPrestacion: idx('OBSERVACIÓN DE NO PRESTACIÓN DE SERVICIO'),
+    motivoInactivacion: idx('MOTIVO DE INACTIVACIÓN'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
@@ -123,6 +132,8 @@ async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
       totalGestiones: getNum(row, COLS.totalGestiones),
       ultimoEstado: String(get(row, COLS.ultimoEstado) || ''),
       gestionStatus: String(get(row, COLS.gestionStatus) || 'SIN GESTIÓN').trim(),
+      observacionNoPrestacion: fixMojibake(String(get(row, COLS.observacionNoPrestacion) || '').trim()),
+      motivoInactivacion: fixMojibake(String(get(row, COLS.motivoInactivacion) || '').trim()),
     }))
     .filter((r) => r.workerId || r.nombreCompleto);
 

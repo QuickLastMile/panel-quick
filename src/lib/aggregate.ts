@@ -128,6 +128,22 @@ export function filterRowsByJefatura(rows: ServiceRow[], jefatura: string): Serv
   return rows.filter((r) => r.jefatura === jefatura);
 }
 
+// Lista de proyectos reales (para el filtro de Reporte general) — misma
+// exclusión de "sin clasificar" que listJefaturas.
+export function listProyectos(rows: ServiceRow[]): string[] {
+  const set = new Set<string>();
+  rows.forEach((r) => {
+    const p = r.proyecto.trim();
+    if (p && !SIN_CLASIFICAR.has(p.toUpperCase())) set.add(p);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+export function filterRowsByProyecto(rows: ServiceRow[], proyecto: string): ServiceRow[] {
+  if (!proyecto) return rows;
+  return rows.filter((r) => r.proyecto === proyecto);
+}
+
 export type MesProyectoPoint = { mes: string; mesLabel: string; proyecto: string; count: number };
 export type DiaProyectoPoint = {
   fecha: string;

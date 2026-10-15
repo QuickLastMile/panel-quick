@@ -25,6 +25,15 @@ export function bogotaToday(): { year: number; month: number; day: number } {
   return { year: get('year'), month: get('month'), day: get('day') };
 }
 
+// Día de ayer en hora de Bogotá — usado como valor por defecto en páginas
+// cuya data se actualiza con un día de rezago (ej. Onboarding).
+export function bogotaYesterday(): { year: number; month: number; day: number } {
+  const t = bogotaToday();
+  const d = new Date(Date.UTC(t.year, t.month - 1, t.day));
+  d.setUTCDate(d.getUTCDate() - 1);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
 // FECHA SOLICITUD viene de Quick como "D/M/AAAA" (sin ceros a la izquierda).
 export function parseFechaSolicitud(fecha: string): { year: number; month: number; day: number } | null {
   const parts = fecha.split('/');
@@ -36,14 +45,19 @@ export function parseFechaSolicitud(fecha: string): { year: number; month: numbe
   return { year, month, day };
 }
 
-// Lee el filtro desde los searchParams de la URL; por defecto, hoy (modo día).
-export function parseDateFilterParams(searchParams: Record<string, string | string[] | undefined>): DateFilter {
-  const today = bogotaToday();
+// Lee el filtro desde los searchParams de la URL; por defecto, hoy (modo
+// día) — o el día que indique `defaultDay`, para páginas (ej. Onboarding)
+// cuya data se actualiza con un día de rezago y por eso no quieren arrancar
+// mostrando "hoy" en blanco.
+export function parseDateFilterParams(
+  searchParams: Record<string, string | string[] | undefined>,
+  defaultDay: SimpleDate = bogotaToday()
+): DateFilter {
   const modeParam = searchParams.mode;
   const mode: DateFilterMode = modeParam === 'month' ? 'month' : modeParam === 'range' ? 'range' : 'day';
-  const year = Number(searchParams.year) || today.year;
-  const month = Number(searchParams.month) || today.month;
-  const day = Number(searchParams.day) || today.day;
+  const year = Number(searchParams.year) || defaultDay.year;
+  const month = Number(searchParams.month) || defaultDay.month;
+  const day = Number(searchParams.day) || defaultDay.day;
   if (mode === 'range') {
     const endYear = Number(searchParams.endYear) || year;
     const endMonth = Number(searchParams.endMonth) || month;
