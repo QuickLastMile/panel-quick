@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { Users, UserCog, Users2, Percent, CheckCircle2, Timer, Medal } from 'lucide-react';
-import type { ServiceRow } from '@/lib/sheets';
 import type { GestorStat, DiaSemanaPoint } from '@/lib/aggregate';
 import type { SimpleDate, DateFilter } from '@/lib/date-filter';
 import { STATUS_COLOR } from '@/lib/status-colors';
@@ -46,7 +45,7 @@ export default function GestoresClient({
   asignadorTrend,
   diaSemana,
   porHoraAsignacion,
-  allRows,
+  teamClosedPct,
   defaultDay,
   pageFilter,
 }: {
@@ -54,14 +53,17 @@ export default function GestoresClient({
   porTipoAsignador: { key: string; count: number }[];
   asignadorTrend: TipoAsignadorTrend;
   diaSemana: DiaSemanaPoint[];
-  porHoraAsignacion: { hora: number; tipo: string; count: number }[];
-  allRows: ServiceRow[];
+  porHoraAsignacion: { hora: number; tipo: string; gestor: string; count: number }[];
+  teamClosedPct: number;
   defaultDay: SimpleDate;
   pageFilter: DateFilter;
 }) {
   const [fGestor, setFGestor] = useState('');
   const [openGestor, setOpenGestor] = useState<string | null>(null);
   const [gestorView, setGestorView] = useState<'cantidad' | 'tiempo'>('cantidad');
+  // Filtro propio de "Asignaciones por franja horaria" — por asignador
+  // puntual, independiente del filtro de "Gestor" de arriba.
+  const [fAsignadorFranja, setFAsignadorFranja] = useState('');
 
   const gestores = useMemo(() => gestorStats.map((g) => g.gestor).sort((a, b) => a.localeCompare(b, 'es')), [gestorStats]);
 
@@ -141,9 +143,10 @@ export default function GestoresClient({
   // horas sin NINGÚN dato (en ninguna de las dos series) al inicio/fin.
   const horaAsignacionSeries = useMemo(() => {
     const TIPOS = ['AGILIZADOR', 'COORDINADOR'];
+    const scoped = fAsignadorFranja ? porHoraAsignacion.filter((p) => p.gestor === fAsignadorFranja) : porHoraAsignacion;
     const byTipoHora: Record<string, number> = {};
-    porHoraAsignacion.forEach((p) => {
-      byTipoHora[`${p.hora}|||${p.tipo}`] = p.count;
+    scoped.forEach((p) => {
+      byTipoHora[`${p.hora}|||${p.tipo}`] = (byTipoHora[`${p.hora}|||${p.tipo}`] || 0) + p.count;
     });
     const totalPorHora = Array.from({ length: 24 }, (_, h) => TIPOS.reduce((s, t) => s + (byTipoHora[`${h}|||${t}`] || 0), 0));
     const first = totalPorHora.findIndex((c) => c > 0);
@@ -156,7 +159,7 @@ export default function GestoresClient({
       color: TIPO_ASIGNADOR_COLOR[tipo],
       points: horas.map((h) => ({ label: `${String(h).padStart(2, '0')}:00`, value: byTipoHora[`${h}|||${tipo}`] || 0 })),
     }));
-  }, [porHoraAsignacion]);
+  }, [porHoraAsignacion, fAsignadorFranja]);
 
   const gestorChartItems = useMemo(() => {
     if (gestorView === 'cantidad') return filteredStats.map((g) => ({ key: g.gestor, count: g.total }));
@@ -232,6 +235,31 @@ export default function GestoresClient({
         description='Columna "HORA ASIGNACIÓN" — separado por agilizador y administrativo. Usa el filtro de fecha de arriba.'
         className="mb-5"
       >
+        <div className="mb-4 flex flex-wrap items-end gap-2.5">
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Asignador</span>
+            <select
+              value={fAsignadorFranja}
+              onChange={(e) => setFAsignadorFranja(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+            >
+              <option value="">Todos</option>
+              {gestores.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </label>
+          {fAsignadorFranja && (
+            <button
+              onClick={() => setFAsignadorFranja('')}
+              className="text-xs font-semibold text-[var(--accent-bright)] hover:underline"
+            >
+              Limpiar filtro
+            </button>
+          )}
+        </div>
         <MultiTrendLineChart series={horaAsignacionSeries} emptyMessage="Sin asignaciones para esta fecha." />
       </ChartCard>
 
@@ -363,7 +391,7 @@ export default function GestoresClient({
         <DiaSemanaChart diaSemana={diaSemana} />
       </ChartCard>
 
-      <GestorDetailPanel gestor={openGestor} allRows={allRows} defaultDay={defaultDay} onClose={() => setOpenGestor(null)} />
+      <GestorDetailPanel gestor={openGestor} teamClosedPct={teamClosedPct} defaultDay={defaultDay} onClose={() => setOpenGestor(null)} />
     </div>
   );
 }

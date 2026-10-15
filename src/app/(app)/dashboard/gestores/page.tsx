@@ -1,6 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildDashboardData, buildTipoAsignadorTrend, buildDiaSemanaStats, isSinClasificar } from '@/lib/aggregate';
-import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
+import { buildDashboardData, buildTipoAsignadorTrend, buildDiaSemanaStats, isSinClasificar, computeTeamClosedPct } from '@/lib/aggregate';
+import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime, bogotaToday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -21,6 +21,7 @@ export default async function GestoresPage({
   // tendencia real de quién asigna a través del tiempo.
   const asignadorTrend = buildTipoAsignadorTrend(cleanRows);
   const diaSemana = buildDiaSemanaStats(cleanRows);
+  const teamClosedPct = computeTeamClosedPct(cleanRows, bogotaToday());
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
@@ -38,7 +39,7 @@ export default async function GestoresPage({
         asignadorTrend={asignadorTrend}
         diaSemana={diaSemana}
         porHoraAsignacion={data.porHoraAsignacion}
-        allRows={cleanRows}
+        teamClosedPct={teamClosedPct}
         defaultDay={{ year: filter.year, month: filter.month, day: filter.day }}
         pageFilter={filter}
       />

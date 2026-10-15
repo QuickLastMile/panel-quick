@@ -1,5 +1,5 @@
 import type { ServiceRow } from './sheets';
-import { parseFechaSolicitud } from './date-filter';
+import { parseFechaSolicitud, daysBetween, type SimpleDate } from './date-filter';
 
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
 const TERMINAL = new Set(['Finalizado', 'Cancelado']);
@@ -108,7 +108,7 @@ export type DashboardData = {
   porTipoAsignador: { key: string; count: number }[];
   porJefatura: { key: string; count: number }[];
   porMotivoCancelacion: { key: string; count: number }[];
-  porHoraAsignacion: { hora: number; tipo: string; count: number }[];
+  porHoraAsignacion: { hora: number; tipo: string; gestor: string; count: number }[];
   gestorStats: GestorStat[];
 };
 
@@ -310,12 +310,14 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     const h = parseHour(r.horaAsignacion);
     if (h === null) return;
     if (!r.tipoAsignador || EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) return;
-    const key = `${h}|||${r.tipoAsignador}`;
+    // El gestor va en la clave para poder filtrar esta gráfica por
+    // asignador puntual sin tener que mandar las filas crudas al cliente.
+    const key = `${h}|||${r.tipoAsignador}|||${r.gestor}`;
     porHoraAsignacionMap[key] = (porHoraAsignacionMap[key] || 0) + 1;
   });
   const porHoraAsignacion = Object.entries(porHoraAsignacionMap).map(([k, count]) => {
-    const [hora, tipo] = k.split('|||');
-    return { hora: Number(hora), tipo, count };
+    const [hora, tipo, gestor] = k.split('|||');
+    return { hora: Number(hora), tipo, gestor, count };
   });
 
   const porGestor: Record<
@@ -593,4 +595,21 @@ export function findDobleAsignacion(rows: ServiceRow[]): DobleAsignacion[] {
     .filter((g) => g.proyectos.length >= 2)
     .filter((g) => !g.rows.every((r) => r.servicio === 'Medio Dia'))
     .sort((a, b) => b.rows.length - a.rows.length);
+}
+
+// % del equipo completo (todos los gestores) con servicios de días
+// anteriores ya cerrados (Finalizado/Cancelado) a la fecha de hoy — punto
+// de comparación para el detalle de un gestor puntual. Se calcula acá, del
+// lado del servidor, para no tener que mandar las filas completas del
+// histórico al cliente solo para este número.
+export function computeTeamClosedPct(rows: ServiceRow[], today: SimpleDate): number {
+  let past = 0;
+  let open = 0;
+  rows.forEach((r) => {
+    const f = parseFechaSolicitud(r.fechaSolicitud);
+    if (!f || daysBetween(f, today) <= 0) return;
+    past += 1;
+    if (!TERMINAL.has(normEstado(r.estado))) open += 1;
+  });
+  return past ? Math.round(((past - open) / past) * 1000) / 10 : 100;
 }

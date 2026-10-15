@@ -10,6 +10,7 @@ import { bogotaToday, daysBetween, parseFechaSolicitud, type SimpleDate } from '
 import StatusPill from './status-pill';
 import TrendLineChart from './charts/trend-line-chart';
 import ServiceDetailPanel from './service-detail-panel';
+import { getServiciosDeGestor, searchServicios } from '@/app/(app)/dashboard/gestores/actions';
 
 const TABS = ['General', 'Gestión', 'Seguimiento'] as const;
 type Tab = (typeof TABS)[number];
@@ -154,12 +155,12 @@ function SeguimientoTable({ rows }: { rows: { row: ServiceRow; diff: number }[] 
 
 export default function GestorDetailPanel({
   gestor,
-  allRows,
+  teamClosedPct,
   defaultDay,
   onClose,
 }: {
   gestor: string | null;
-  allRows: ServiceRow[];
+  teamClosedPct: number;
   defaultDay: SimpleDate;
   onClose: () => void;
 }) {
@@ -168,6 +169,10 @@ export default function GestorDetailPanel({
   const [day, setDay] = useState<SimpleDate>(defaultDay);
   const [search, setSearch] = useState('');
   const [selectedRow, setSelectedRow] = useState<ServiceRow | null>(null);
+  const [gestorRows, setGestorRows] = useState<ServiceRow[]>([]);
+  const [loadingGestor, setLoadingGestor] = useState(false);
+  const [searchResults, setSearchResults] = useState<ServiceRow[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -176,9 +181,56 @@ export default function GestorDetailPanel({
       setTab('General');
       setDay(defaultDay);
       setSearch('');
+      setSearchResults([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gestor]);
+
+  // Se trae solo cuando se abre un gestor puntual — evita mandar las ~78k
+  // filas del histórico al cliente en cada carga de Seguimiento gestores.
+  useEffect(() => {
+    if (!gestor) return;
+    setGestorRows([]);
+    setLoadingGestor(true);
+    let cancelled = false;
+    getServiciosDeGestor(gestor)
+      .then((rows) => {
+        if (!cancelled) setGestorRows(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingGestor(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gestor]);
+
+  // La búsqueda es sobre todo el histórico (no solo este gestor), así que
+  // también va al servidor — con un pequeño debounce para no golpear la
+  // acción en cada tecla.
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      searchServicios(q)
+        .then((rows) => {
+          if (!cancelled) setSearchResults(rows);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [search]);
 
   useEffect(() => {
     if (!gestor) return;
@@ -198,22 +250,7 @@ export default function GestorDetailPanel({
   }, [gestor, onClose]);
 
   const today = bogotaToday();
-  const gestorRows = useMemo(() => (gestor ? allRows.filter((r) => r.gestor === gestor) : []), [allRows, gestor]);
   const cargo = gestorRows[0]?.cargoGestor || '';
-
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return allRows
-      .filter(
-        (r) =>
-          r.id.toLowerCase().includes(q) ||
-          r.identTrabajador.toLowerCase().includes(q) ||
-          r.nombreTrabajador.toLowerCase().includes(q) ||
-          r.gestor.toLowerCase().includes(q)
-      )
-      .slice(0, 30);
-  }, [allRows, search]);
 
   const dayRows = useMemo(
     () => gestorRows.filter((r) => sameDay(parseFechaSolicitud(r.fechaSolicitud), day)),
@@ -257,22 +294,6 @@ export default function GestorDetailPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gestorRows, today.year, today.month, today.day]);
   const pastClosedPct = pastTotal ? Math.round(((pastTotal - seguimiento.length) / pastTotal) * 1000) / 10 : 100;
-
-  // Tasa global del equipo (todos los gestores juntos) con la misma lógica,
-  // para tener un punto de comparación — un 92% no dice nada si no se sabe
-  // si el resto del equipo está en 98% o en 80%.
-  const teamClosedPct = useMemo(() => {
-    let past = 0;
-    let open = 0;
-    allRows.forEach((r) => {
-      const f = parseFechaSolicitud(r.fechaSolicitud);
-      if (!f || daysBetween(f, today) <= 0) return;
-      past++;
-      if (!TERMINAL.has(normEstado(r.estado))) open++;
-    });
-    return past ? Math.round(((past - open) / past) * 1000) / 10 : 100;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRows, today.year, today.month, today.day]);
 
   // Sin asignar = nunca se le dio mensajero; asignado-no-cerrado = ya tiene
   // mensajero pero no se le dio seguimiento al cierre. Son dos fallas
@@ -371,9 +392,11 @@ export default function GestorDetailPanel({
               {search.trim() ? (
                 <div>
                   <p className="mb-3 text-xs text-[var(--text-muted)]">
-                    {searchResults.length} resultado{searchResults.length === 1 ? '' : 's'}
-                    {searchResults.length === 30 ? ' (mostrando los primeros 30 — afina la búsqueda)' : ''} — busca en todo el histórico,
-                    no solo en este gestor.
+                    {searching
+                      ? 'Buscando…'
+                      : `${searchResults.length} resultado${searchResults.length === 1 ? '' : 's'}${
+                          searchResults.length === 30 ? ' (mostrando los primeros 30 — afina la búsqueda)' : ''
+                        } — busca en todo el histórico, no solo en este gestor.`}
                   </p>
                   <RowsTable rows={searchResults} onSelect={setSelectedRow} />
                 </div>
@@ -381,8 +404,9 @@ export default function GestorDetailPanel({
                 <div>
                   <DayNav day={day} today={today} onChange={setDay} />
                   <p className="my-3 text-xs text-[var(--text-muted)]">
-                    Servicios de este gestor solicitados el {dayValue.split('-').reverse().join('/')} — todos los estados (
-                    {dayRows.length.toLocaleString('es-CO')}).
+                    {loadingGestor
+                      ? 'Cargando…'
+                      : `Servicios de este gestor solicitados el ${dayValue.split('-').reverse().join('/')} — todos los estados (${dayRows.length.toLocaleString('es-CO')}).`}
                   </p>
                   <RowsTable rows={dayRows} onSelect={setSelectedRow} />
                 </div>
