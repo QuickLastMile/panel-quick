@@ -27,6 +27,8 @@ export default function OnboardingClient({
   zamirMeta,
   isFilteredToday,
   filterLabel,
+  isReferenceMonthCurrent,
+  referenceMonthLabel,
 }: {
   // Vinculados según el filtro de fecha de arriba (Día/Rango/Mes).
   rows: VinculacionRow[];
@@ -38,6 +40,9 @@ export default function OnboardingClient({
   zamirMeta: AgilizadorMeta;
   isFilteredToday: boolean;
   filterLabel: string;
+  // Mes del día seleccionado en el filtro — para la meta mensual de Zamir.
+  isReferenceMonthCurrent: boolean;
+  referenceMonthLabel: string;
 }) {
   const [fAgilizador, setFAgilizador] = useState('');
   const [selected, setSelected] = useState<VinculacionRow | null>(null);
@@ -65,9 +70,11 @@ export default function OnboardingClient({
   const mesPoints = historico.mesVinculacion.map((m) => ({ label: m.mesLabel, value: m.count }));
   const diaPoints = historico.diaVinculacion.map((d) => ({ label: d.fechaLabel, value: d.count }));
 
+  // "Ya gestionaron vs. sin gestión" es acumulado/histórico — no se filtra
+  // por el día/rango de la página de arriba, solo por el agilizador.
   const gestionItems = useMemo(
-    () => data.porGestionStatus.map((g) => ({ key: GESTION_LABEL[g.key] || g.key, count: g.count })),
-    [data.porGestionStatus]
+    () => historico.porGestionStatus.map((g) => ({ key: GESTION_LABEL[g.key] || g.key, count: g.count })),
+    [historico.porGestionStatus]
   );
 
   return (
@@ -103,7 +110,13 @@ export default function OnboardingClient({
           iconColor="#f3c94f"
           sub={isFilteredToday ? undefined : filterLabel}
         />
-        <StatCard label="Vinculados hoy" value={kpis.vinculadosHoy.toLocaleString('es-CO')} icon={CalendarCheck} iconColor="#4f9df5" />
+        <StatCard
+          label={isFilteredToday ? 'Vinculados hoy' : 'Vinculados ese día'}
+          value={kpis.vinculadosHoy.toLocaleString('es-CO')}
+          icon={CalendarCheck}
+          iconColor="#4f9df5"
+          sub={isFilteredToday ? undefined : filterLabel}
+        />
         <StatCard
           label="Promedio por día"
           value={kpis.promedioPorDia.toLocaleString('es-CO', { maximumFractionDigits: 1 })}
@@ -121,42 +134,20 @@ export default function OnboardingClient({
       </div>
 
       <ChartCard
-        title="Ya gestionaron vs. sin gestión"
-        description='Columna "gestión" del Sheet — cuántos de los vinculados ya trabajaron al menos un servicio.'
-        className="mb-5"
-      >
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="panel-card rounded-xl p-4">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Ya gestionaron</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{data.gestionaron}</p>
-          </div>
-          <div className="panel-card rounded-xl p-4">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Sin gestión</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{data.sinGestion}</p>
-          </div>
-        </div>
-        {gestionItems.length ? (
-          <RankingBarList items={gestionItems} showPercent />
-        ) : (
-          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin vinculaciones para esta fecha.</p>
-        )}
-      </ChartCard>
-
-      <ChartCard
         title="Meta de vinculación — Zamir Andres Arcia"
         description="Meta: 5 vinculaciones por día / 150 al mes."
         className="mb-5"
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            label="Hoy"
+            label={isFilteredToday ? 'Hoy' : filterLabel}
             value={`${zamirMeta.vinculadosHoy} / ${zamirMeta.metaDiaria}`}
             icon={Target}
             iconColor={zamirMeta.pctDiaria >= 100 ? '#3fb950' : '#f3c94f'}
             sub={`${zamirMeta.pctDiaria}% de la meta diaria`}
           />
           <StatCard
-            label="Este mes"
+            label={isReferenceMonthCurrent ? 'Este mes' : referenceMonthLabel}
             value={`${zamirMeta.vinculadosMes} / ${zamirMeta.metaMensual}`}
             icon={Target}
             iconColor={zamirMeta.pctMensual >= 100 ? '#3fb950' : '#f3c94f'}
@@ -170,6 +161,28 @@ export default function OnboardingClient({
             sub="% de sus vinculados que ya gestionan"
           />
         </div>
+      </ChartCard>
+
+      <ChartCard
+        title="Ya gestionaron vs. sin gestión"
+        description='Columna "gestión" del Sheet — acumulado histórico, independiente del filtro de fecha de arriba.'
+        className="mb-5"
+      >
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Ya gestionaron</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--accent-bright)] tabular-nums">{historico.gestionaron}</p>
+          </div>
+          <div className="panel-card rounded-xl p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Sin gestión</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{historico.sinGestion}</p>
+          </div>
+        </div>
+        {gestionItems.length ? (
+          <RankingBarList items={gestionItems} showPercent />
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin vinculaciones registradas.</p>
+        )}
       </ChartCard>
 
       <ChartCard
@@ -216,7 +229,7 @@ export default function OnboardingClient({
         )}
       </ChartCard>
 
-      <VinculadosTable rows={scopedRows} onSelect={setSelected} />
+      <VinculadosTable rows={scopedRows} allRows={scopedAllRows} onSelect={setSelected} />
 
       <VinculadoDetailPanel vinculado={selected} serviceRows={serviceRows} onClose={() => setSelected(null)} />
     </div>

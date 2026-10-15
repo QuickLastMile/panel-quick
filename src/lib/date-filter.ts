@@ -113,6 +113,10 @@ const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
+export function formatMonthLabel(year: number, month: number): string {
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
 export function formatDateFilterLabel(filter: DateFilter): string {
   if (filter.mode === 'month') return `${MONTH_NAMES[filter.month - 1]} ${filter.year}`;
   if (filter.mode === 'range') {

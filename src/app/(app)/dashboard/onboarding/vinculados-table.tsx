@@ -2,8 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import type { VinculacionRow } from '@/lib/onboarding';
+import { parseFechaSolicitud } from '@/lib/date-filter';
 
 const PAGE_SIZE = 50;
+
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
 
 type Col = { key: keyof VinculacionRow; label: string };
 
@@ -30,7 +40,21 @@ function distinct(rows: VinculacionRow[], key: keyof VinculacionRow): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-export default function VinculadosTable({ rows, onSelect }: { rows: VinculacionRow[]; onSelect: (row: VinculacionRow) => void }) {
+export default function VinculadosTable({
+  rows,
+  allRows,
+  onSelect,
+}: {
+  // Vinculados según el filtro de fecha de la página de arriba.
+  rows: VinculacionRow[];
+  // Histórico completo (acotado solo por agilizador si hay filtro) — para
+  // el toggle "mostrar todos", con sus propios filtros de mes/día.
+  allRows: VinculacionRow[];
+  onSelect: (row: VinculacionRow) => void;
+}) {
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+  const [fMes, setFMes] = useState('');
+  const [fDia, setFDia] = useState('');
   const [search, setSearch] = useState('');
   const [fCiudad, setFCiudad] = useState('');
   const [fVehiculo, setFVehiculo] = useState('');
@@ -38,16 +62,51 @@ export default function VinculadosTable({ rows, onSelect }: { rows: VinculacionR
   const [sort, setSort] = useState<{ col: keyof VinculacionRow; dir: 'asc' | 'desc' }>({ col: 'fechaVinculacion', dir: 'desc' });
   const [page, setPage] = useState(0);
 
+  const mesOptions = useMemo(() => {
+    const set = new Set<string>();
+    allRows.forEach((r) => {
+      const f = parseFechaSolicitud(r.fechaVinculacion);
+      if (f) set.add(`${f.year}-${pad2(f.month)}`);
+    });
+    return Array.from(set).sort().reverse();
+  }, [allRows]);
+
+  const diaOptions = useMemo(() => {
+    if (!fMes) return [];
+    const [y, m] = fMes.split('-').map(Number);
+    const set = new Set<number>();
+    allRows.forEach((r) => {
+      const f = parseFechaSolicitud(r.fechaVinculacion);
+      if (f && f.year === y && f.month === m) set.add(f.day);
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allRows, fMes]);
+
+  // Base de filas antes de los filtros de ciudad/vehículo/gestión/búsqueda:
+  // histórico completo + mes/día propios si "mostrar todos" está activo, o
+  // las filas ya acotadas por el filtro de fecha de la página si no.
+  const baseRows = useMemo(() => {
+    if (!mostrarTodos) return rows;
+    if (!fMes) return allRows;
+    const [y, m] = fMes.split('-').map(Number);
+    return allRows.filter((r) => {
+      const f = parseFechaSolicitud(r.fechaVinculacion);
+      if (!f || f.year !== y || f.month !== m) return false;
+      if (fDia && f.day !== Number(fDia)) return false;
+      return true;
+    });
+  }, [rows, allRows, mostrarTodos, fMes, fDia]);
+
   const filterOptions = useMemo(
     () => ({
-      ciudad: distinct(rows, 'ciudad'),
-      vehiculo: distinct(rows, 'vehiculo'),
+      ciudad: distinct(baseRows, 'ciudad'),
+      vehiculo: distinct(baseRows, 'vehiculo'),
     }),
-    [rows]
+    [baseRows]
   );
 
   const filtered = useMemo(() => {
-    let r = rows.filter(
+    let r = baseRows.filter(
       (row) =>
         (!fCiudad || row.ciudad === fCiudad) &&
         (!fVehiculo || row.vehiculo === fVehiculo) &&
@@ -61,7 +120,7 @@ export default function VinculadosTable({ rows, onSelect }: { rows: VinculacionR
       const cmp = String(a[sort.col] || '').localeCompare(String(b[sort.col] || ''), 'es', { numeric: true });
       return sort.dir === 'asc' ? cmp : -cmp;
     });
-  }, [rows, fCiudad, fVehiculo, fGestion, search, sort]);
+  }, [baseRows, fCiudad, fVehiculo, fGestion, search, sort]);
 
   const maxPage = Math.max(Math.ceil(filtered.length / PAGE_SIZE) - 1, 0);
   const pageRows = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
@@ -71,19 +130,82 @@ export default function VinculadosTable({ rows, onSelect }: { rows: VinculacionR
     setPage(0);
   }
 
+  function toggleMostrarTodos() {
+    setMostrarTodos((prev) => !prev);
+    setFMes('');
+    setFDia('');
+    setPage(0);
+  }
+
   function clearFilters() {
     setFCiudad('');
     setFVehiculo('');
     setFGestion('');
+    setFMes('');
+    setFDia('');
     setPage(0);
   }
 
-  const activeFilterCount = [fCiudad, fVehiculo, fGestion].filter(Boolean).length;
+  const activeFilterCount = [fCiudad, fVehiculo, fGestion, mostrarTodos ? fMes : '', mostrarTodos ? fDia : ''].filter(Boolean).length;
 
   return (
     <div className="panel-card rounded-xl p-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2.5">
         <div className="flex flex-wrap items-end gap-2.5">
+          <label className="flex items-center gap-1.5 self-center text-xs font-semibold text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              checked={mostrarTodos}
+              onChange={toggleMostrarTodos}
+              className="h-3.5 w-3.5 accent-[var(--accent)]"
+            />
+            Mostrar todos los vinculados
+          </label>
+          {mostrarTodos && (
+            <>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Mes</span>
+                <select
+                  value={fMes}
+                  onChange={(e) => {
+                    setFMes(e.target.value);
+                    setFDia('');
+                    setPage(0);
+                  }}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+                >
+                  <option value="">Todos</option>
+                  {mesOptions.map((m) => {
+                    const [y, mo] = m.split('-').map(Number);
+                    return (
+                      <option key={m} value={m}>
+                        {MESES[mo - 1]} {y}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Día</span>
+                <select
+                  value={fDia}
+                  onChange={(e) => {
+                    setFDia(e.target.value);
+                    setPage(0);
+                  }}
+                  disabled={!fMes}
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] disabled:opacity-40"
+                >
+                  <option value="">Todos</option>
+                  {diaOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Ciudad</span>
             <select
