@@ -10,12 +10,15 @@ type Col = { key: keyof VinculacionRow; label: string };
 const COLS: Col[] = [
   { key: 'nombreCompleto', label: 'Nombre completo' },
   { key: 'identificacion', label: 'Identificación' },
-  { key: 'tipoIdentificacion', label: 'Tipo ident.' },
   { key: 'fechaVinculacion', label: 'Fecha vinculación' },
   { key: 'ciudad', label: 'Ciudad' },
   { key: 'vehiculo', label: 'Vehículo' },
   { key: 'agilizador', label: 'Agilizador' },
-  { key: 'estadoWorker', label: 'Estado' },
+  { key: 'ultimoServicio', label: 'Último servicio' },
+  { key: 'cantFinalizados', label: 'Finalizados' },
+  { key: 'cantFinalizadosNovedad', label: 'Con novedad' },
+  { key: 'totalGestiones', label: 'Total gestiones' },
+  { key: 'ultimoEstado', label: 'Último estado' },
 ];
 
 function distinct(rows: VinculacionRow[], key: keyof VinculacionRow): string[] {
@@ -27,17 +30,16 @@ function distinct(rows: VinculacionRow[], key: keyof VinculacionRow): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
+export default function VinculadosTable({ rows, onSelect }: { rows: VinculacionRow[]; onSelect: (row: VinculacionRow) => void }) {
   const [search, setSearch] = useState('');
-  const [fAgilizador, setFAgilizador] = useState('');
   const [fCiudad, setFCiudad] = useState('');
   const [fVehiculo, setFVehiculo] = useState('');
+  const [fGestion, setFGestion] = useState('');
   const [sort, setSort] = useState<{ col: keyof VinculacionRow; dir: 'asc' | 'desc' }>({ col: 'fechaVinculacion', dir: 'desc' });
   const [page, setPage] = useState(0);
 
   const filterOptions = useMemo(
     () => ({
-      agilizador: distinct(rows, 'agilizador'),
       ciudad: distinct(rows, 'ciudad'),
       vehiculo: distinct(rows, 'vehiculo'),
     }),
@@ -47,9 +49,9 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
   const filtered = useMemo(() => {
     let r = rows.filter(
       (row) =>
-        (!fAgilizador || row.agilizador === fAgilizador) &&
         (!fCiudad || row.ciudad === fCiudad) &&
-        (!fVehiculo || row.vehiculo === fVehiculo)
+        (!fVehiculo || row.vehiculo === fVehiculo) &&
+        (!fGestion || row.gestionStatus === fGestion)
     );
     if (search) {
       const q = search.toLowerCase();
@@ -59,7 +61,7 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
       const cmp = String(a[sort.col] || '').localeCompare(String(b[sort.col] || ''), 'es', { numeric: true });
       return sort.dir === 'asc' ? cmp : -cmp;
     });
-  }, [rows, fAgilizador, fCiudad, fVehiculo, search, sort]);
+  }, [rows, fCiudad, fVehiculo, fGestion, search, sort]);
 
   const maxPage = Math.max(Math.ceil(filtered.length / PAGE_SIZE) - 1, 0);
   const pageRows = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
@@ -70,36 +72,18 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
   }
 
   function clearFilters() {
-    setFAgilizador('');
     setFCiudad('');
     setFVehiculo('');
+    setFGestion('');
     setPage(0);
   }
 
-  const activeFilterCount = [fAgilizador, fCiudad, fVehiculo].filter(Boolean).length;
+  const activeFilterCount = [fCiudad, fVehiculo, fGestion].filter(Boolean).length;
 
   return (
     <div className="panel-card rounded-xl p-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2.5">
         <div className="flex flex-wrap items-end gap-2.5">
-          <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Agilizador</span>
-            <select
-              value={fAgilizador}
-              onChange={(e) => {
-                setFAgilizador(e.target.value);
-                setPage(0);
-              }}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
-            >
-              <option value="">Todos</option>
-              {filterOptions.agilizador.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Ciudad</span>
             <select
@@ -136,6 +120,22 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
               ))}
             </select>
           </label>
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Gestión</span>
+            <select
+              value={fGestion}
+              onChange={(e) => {
+                setFGestion(e.target.value);
+                setPage(0);
+              }}
+              className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+            >
+              <option value="">Todos</option>
+              <option value="SIN GESTIÓN">Sin gestión</option>
+              <option value="PRIMER SERVICIO NO EFECTIVO">Primer servicio no efectivo</option>
+              <option value="GESTIONANDO">Gestionando</option>
+            </select>
+          </label>
           {activeFilterCount > 0 && (
             <button onClick={clearFilters} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
               Limpiar filtros
@@ -153,10 +153,12 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
         />
       </div>
 
-      <div className="mb-3 text-xs text-[var(--text-muted)]">{filtered.length.toLocaleString('es-CO')} vinculados</div>
+      <div className="mb-3 text-xs text-[var(--text-muted)]">
+        {filtered.length.toLocaleString('es-CO')} vinculados — clic en una fila para ver el detalle
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full min-w-[920px] border-collapse text-xs">
+        <table className="w-full min-w-[1100px] border-collapse text-xs">
           <thead>
             <tr>
               {COLS.map((c) => (
@@ -181,7 +183,11 @@ export default function VinculadosTable({ rows }: { rows: VinculacionRow[] }) {
               </tr>
             ) : (
               pageRows.map((row) => (
-                <tr key={`${row.workerId}-${row.identificacion}`} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                <tr
+                  key={`${row.workerId}-${row.identificacion}`}
+                  onClick={() => onSelect(row)}
+                  className="cursor-pointer border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]"
+                >
                   {COLS.map((c, i) => (
                     <td
                       key={c.key}

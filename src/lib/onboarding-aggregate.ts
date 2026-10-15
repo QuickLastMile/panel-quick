@@ -24,19 +24,33 @@ export type OnboardingData = {
   porVehiculo: { key: string; count: number }[];
   diaVinculacion: DiaVinculacionPoint[];
   mesVinculacion: MesVinculacionPoint[];
+  // "SIN GESTIÓN" / "PRIMER SERVICIO NO EFECTIVO" / "GESTIONANDO" — tal cual
+  // la columna "gestión" del Sheet (ya calculada con fórmulas de cruce).
+  porGestionStatus: { key: string; count: number }[];
+  gestionaron: number;
+  sinGestion: number;
 };
+
+const SIN_GESTION = 'SIN GESTIÓN';
 
 export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
   const porAgilizadorMap: Record<string, number> = {};
   const porCiudadMap: Record<string, number> = {};
   const porVehiculoMap: Record<string, number> = {};
+  const porGestionStatusMap: Record<string, number> = {};
   const diaMap: Record<string, { mes: string; mesLabel: string; count: number }> = {};
   const mesMap: Record<string, { mesLabel: string; count: number }> = {};
+  let gestionaron = 0;
+  let sinGestion = 0;
 
   rows.forEach((r) => {
     if (r.agilizador) bump(porAgilizadorMap, r.agilizador);
     if (r.ciudad) bump(porCiudadMap, r.ciudad);
     if (r.vehiculo) bump(porVehiculoMap, r.vehiculo);
+    const estadoGestion = r.gestionStatus || SIN_GESTION;
+    bump(porGestionStatusMap, estadoGestion);
+    if (estadoGestion === SIN_GESTION) sinGestion += 1;
+    else gestionaron += 1;
 
     const fecha = parseFechaSolicitud(r.fechaVinculacion);
     if (fecha) {
@@ -73,6 +87,9 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
     porVehiculo: toPairs(porVehiculoMap),
     diaVinculacion,
     mesVinculacion,
+    porGestionStatus: toPairs(porGestionStatusMap),
+    gestionaron,
+    sinGestion,
   };
 }
 
@@ -106,5 +123,55 @@ export function buildOnboardingKpis(allRows: VinculacionRow[], today: { year: nu
     vinculadosHoy,
     promedioPorDia: diasSet.size ? validCount / diasSet.size : 0,
     ciudadTop: ciudadTopEntry ? { key: ciudadTopEntry[0], count: ciudadTopEntry[1] } : null,
+  };
+}
+
+export type AgilizadorMeta = {
+  nombre: string;
+  vinculadosHoy: number;
+  metaDiaria: number;
+  pctDiaria: number;
+  vinculadosMes: number;
+  metaMensual: number;
+  pctMensual: number;
+  // % de sus vinculados (histórico) que ya gestionaron al menos un servicio.
+  efectividadPct: number;
+};
+
+// Seguimiento de meta para un agilizador puntual (ej. "ZAMIR ANDRES ARCIA"):
+// meta diaria y mensual de vinculaciones, y qué tan efectivas resultaron
+// (cuántos de sus vinculados ya están gestionando vs. siguen sin gestión).
+export function buildAgilizadorMeta(
+  allRows: VinculacionRow[],
+  nombreAgilizador: string,
+  today: { year: number; month: number; day: number },
+  metaDiaria = 5,
+  metaMensual = 150
+): AgilizadorMeta {
+  const nombreUpper = nombreAgilizador.trim().toUpperCase();
+  const suyos = allRows.filter((r) => r.agilizador.trim().toUpperCase() === nombreUpper);
+
+  let vinculadosHoy = 0;
+  let vinculadosMes = 0;
+  let gestionaron = 0;
+
+  suyos.forEach((r) => {
+    const fecha = parseFechaSolicitud(r.fechaVinculacion);
+    if (fecha) {
+      if (fecha.year === today.year && fecha.month === today.month && fecha.day === today.day) vinculadosHoy += 1;
+      if (fecha.year === today.year && fecha.month === today.month) vinculadosMes += 1;
+    }
+    if ((r.gestionStatus || SIN_GESTION) !== SIN_GESTION) gestionaron += 1;
+  });
+
+  return {
+    nombre: nombreAgilizador,
+    vinculadosHoy,
+    metaDiaria,
+    pctDiaria: metaDiaria ? Math.round((vinculadosHoy / metaDiaria) * 1000) / 10 : 0,
+    vinculadosMes,
+    metaMensual,
+    pctMensual: metaMensual ? Math.round((vinculadosMes / metaMensual) * 1000) / 10 : 0,
+    efectividadPct: suyos.length ? Math.round((gestionaron / suyos.length) * 1000) / 10 : 0,
   };
 }

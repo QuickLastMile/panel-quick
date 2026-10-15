@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
 
-const SHEET_RANGE = 'DATA!A:S';
+// La pestaña ONBOARDING ahora vive en el mismo Sheet de monitoreo (antes era
+// un archivo aparte) — una sola conexión, un solo service account.
+const SHEET_RANGE = 'ONBOARDING!A:V';
 
 export type VinculacionRow = {
   workerId: string;
@@ -16,6 +18,15 @@ export type VinculacionRow = {
   vehiculo: string;
   // Supervisor que hizo la vinculación (columna "AGILIZADOR" del Sheet).
   agilizador: string;
+  // Columnas con fórmulas de cruce contra Datos_Actuales, agregadas por la
+  // supervisora — resumen rápido sin tener que ir a buscar el detalle.
+  ultimoServicio: string;
+  cantFinalizados: number;
+  cantFinalizadosNovedad: number;
+  totalGestiones: number;
+  ultimoEstado: string;
+  // Columna "gestión": "SIN GESTIÓN" / "PRIMER SERVICIO NO EFECTIVO" / "GESTIONANDO".
+  gestionStatus: string;
 };
 
 function getAuth() {
@@ -48,8 +59,8 @@ export type OnboardingSnapshot = {
 };
 
 async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
-  const spreadsheetId = process.env.ONBOARDING_SHEET_ID;
-  if (!spreadsheetId) throw new Error('Falta ONBOARDING_SHEET_ID en las variables de entorno.');
+  const spreadsheetId = process.env.MONITOREO_SHEET_ID;
+  if (!spreadsheetId) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
 
   const sheets = google.sheets({ version: 'v4', auth: getAuth() });
   const res = await sheets.spreadsheets.values.get({
@@ -64,7 +75,7 @@ async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
   const headers = values[0] as string[];
   const idx = (name: string) => headers.indexOf(name);
   // "CIUDAD" y "VEHICULO" aparecen dos veces (una con código numérico, otra
-  // ya limpia) — se usa la última ocurrencia, que es la versión limpia (Q/R).
+  // ya limpia) — se usa la última ocurrencia, que es la versión limpia.
   const lastIdx = (name: string) => headers.lastIndexOf(name);
 
   const COLS = {
@@ -78,10 +89,20 @@ async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
     estadoWorker: idx('ESTADO DEL WORKER'),
     ciudad: lastIdx('CIUDAD'),
     vehiculo: lastIdx('VEHICULO'),
-    agilizador: idx('AGILIZADOR'),
+    agilizador: lastIdx('AGILIZADOR'),
+    ultimoServicio: idx('ULTIMO SERVICIO'),
+    cantFinalizados: idx('CANT FINALIZADOS'),
+    cantFinalizadosNovedad: idx('CANT FINALIZADOS NOVEDAD'),
+    totalGestiones: idx('TOTAL GESTIONES'),
+    ultimoEstado: idx('ULTIMO ESTADO'),
+    gestionStatus: lastIdx('gestión'),
   };
 
   const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
+  const getNum = (row: unknown[], i: number) => {
+    const n = Number(get(row, i));
+    return Number.isFinite(n) ? n : 0;
+  };
 
   const rows = (values.slice(1) as unknown[][])
     .map((row) => ({
@@ -96,6 +117,12 @@ async function fetchOnboardingUncached(): Promise<OnboardingSnapshot> {
       ciudad: fixMojibake(String(get(row, COLS.ciudad) || '').trim()),
       vehiculo: fixMojibake(String(get(row, COLS.vehiculo) || '').trim()),
       agilizador: fixMojibake(String(get(row, COLS.agilizador) || '').trim()),
+      ultimoServicio: String(get(row, COLS.ultimoServicio) || ''),
+      cantFinalizados: getNum(row, COLS.cantFinalizados),
+      cantFinalizadosNovedad: getNum(row, COLS.cantFinalizadosNovedad),
+      totalGestiones: getNum(row, COLS.totalGestiones),
+      ultimoEstado: String(get(row, COLS.ultimoEstado) || ''),
+      gestionStatus: String(get(row, COLS.gestionStatus) || 'SIN GESTIÓN').trim(),
     }))
     .filter((r) => r.workerId || r.nombreCompleto);
 
