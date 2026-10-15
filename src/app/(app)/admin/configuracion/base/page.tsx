@@ -1,0 +1,61 @@
+import { getSheetsSnapshot } from '@/lib/sheets';
+import { getProyectoBaseRows, getColaboradorBaseRows } from '@/lib/base';
+import { requireRole } from '@/lib/session';
+import PageHeader from '@/components/page-header';
+import ConfigTabs from '@/components/config-tabs';
+import BaseClient from './base-client';
+
+export default async function BaseConfigPage() {
+  await requireRole(['admin']);
+
+  const [{ rows }, proyectoRows, colaboradorRows] = await Promise.all([
+    getSheetsSnapshot(),
+    getProyectoBaseRows(),
+    getColaboradorBaseRows(),
+  ]);
+
+  // "Sin clasificar": emails y usuarios de asignación que la fórmula de
+  // Datos_Actuales no encontró en BASE (cayó en el "nn"/"OTRO" por
+  // defecto) — así sabes qué falta agregar sin tener que ir al Sheet.
+  const emailCounts = new Map<string, number>();
+  const colaboradorCounts = new Map<string, number>();
+  rows.forEach((r) => {
+    if (r.jefatura.trim().toLowerCase() === 'nn' && r.email.trim()) {
+      const key = r.email.trim();
+      emailCounts.set(key, (emailCounts.get(key) || 0) + 1);
+    }
+    if (r.gestor.trim().toUpperCase() === 'OTRO' && r.usuarioAsignacion.trim()) {
+      const key = r.usuarioAsignacion.trim();
+      colaboradorCounts.set(key, (colaboradorCounts.get(key) || 0) + 1);
+    }
+  });
+
+  const emailsSinClasificar = Array.from(emailCounts.entries())
+    .map(([email, count]) => ({ email, count }))
+    .sort((a, b) => b.count - a.count);
+  const colaboradoresSinClasificar = Array.from(colaboradorCounts.entries())
+    .map(([colaboradorData, count]) => ({ colaboradorData, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return (
+    <div>
+      <PageHeader eyebrow="Configuración" title="Base de" accent="cruce (PROYECTO / GESTOR)" />
+      <ConfigTabs />
+
+      <div className="mb-5 flex gap-2.5 rounded-lg bg-[var(--accent-soft)] p-3 text-xs text-[var(--accent-bright)]">
+        <span>🔗</span>
+        <span>
+          Esta es la hoja <b>BASE</b> del Sheet — lo que edites acá se refleja de inmediato en las fórmulas que calculan PROYECTO,
+          JEFATURA, GESTOR, CARGO GESTOR y TIPO ASIGNADOR en Datos_Actuales. Ya no necesitas abrir Google Sheets para mantenerla.
+        </span>
+      </div>
+
+      <BaseClient
+        proyectoRows={proyectoRows}
+        colaboradorRows={colaboradorRows}
+        emailsSinClasificar={emailsSinClasificar}
+        colaboradoresSinClasificar={colaboradoresSinClasificar}
+      />
+    </div>
+  );
+}

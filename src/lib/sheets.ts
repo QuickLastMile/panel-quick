@@ -17,6 +17,9 @@ export type ServiceRow = {
   descCancelacion: string;
   // Quién canceló el servicio (usuario de Quick) — vacío si no se canceló.
   usuarioCancelacion: string;
+  // "ID-Nombre" de quién asignó el servicio — es la clave con la que la
+  // hoja BASE resuelve GESTOR/CARGO GESTOR/TIPO ASIGNADOR.
+  usuarioAsignacion: string;
   diaSolicitud: number | null;
   anioSolicitud: number | null;
   mesNumSolicitud: number | null;
@@ -104,6 +107,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     razonCancelacion: idx('Razon de Cancelacion'),
     descCancelacion: idx('Descripcion de Cancelacion'),
     usuarioCancelacion: idx('Usuario Cancelación'),
+    usuarioAsignacion: idx('Usuario Asignación'),
     diaSolicitud: idx('DÍA SOLICITUD'),
     anioSolicitud: idx('AÑO SOLICITUD'),
     mesNumSolicitud: idx('MES # SOLICITUD'),
@@ -149,6 +153,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       razonCancelacion: String(get(row, COLS.razonCancelacion) || ''),
       descCancelacion: String(get(row, COLS.descCancelacion) || ''),
       usuarioCancelacion: String(get(row, COLS.usuarioCancelacion) || ''),
+      usuarioAsignacion: String(get(row, COLS.usuarioAsignacion) || ''),
       diaSolicitud: Number(get(row, COLS.diaSolicitud)) || null,
       anioSolicitud: Number(get(row, COLS.anioSolicitud)) || null,
       mesNumSolicitud: Number(get(row, COLS.mesNumSolicitud)) || null,

@@ -20,6 +20,7 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/directorio',
     '/dashboard/onboarding',
     '/admin/configuracion',
+    '/admin/configuracion/base',
     '/admin/configuracion/historial',
     '/admin/configuracion/usuarios',
   ],

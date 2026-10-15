@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const TABS = [
   { href: '/admin/configuracion', label: 'General' },
+  { href: '/admin/configuracion/base', label: 'Base de cruce' },
   { href: '/admin/configuracion/historial', label: 'Historial de automatización' },
   { href: '/admin/configuracion/usuarios', label: 'Usuarios' },
 ];
