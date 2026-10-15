@@ -7,7 +7,7 @@ import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
 import OnboardingClient from './onboarding-client';
 
-// Agilizador al que se le hace seguimiento puntual de meta (5/día, 150/mes).
+// Agilizador al que se le hace seguimiento puntual de meta (5/día, 130/mes).
 const AGILIZADOR_SEGUIMIENTO = 'ZAMIR ANDRES ARCIA';
 
 export default async function OnboardingPage({

@@ -135,7 +135,7 @@ export default function OnboardingClient({
 
       <ChartCard
         title="Meta de vinculación — Zamir Andres Arcia"
-        description="Meta: 5 vinculaciones por día / 150 al mes."
+        description="Meta: 5 vinculaciones por día / 130 al mes."
         className="mb-5"
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

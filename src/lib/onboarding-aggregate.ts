@@ -146,7 +146,7 @@ export function buildAgilizadorMeta(
   nombreAgilizador: string,
   today: { year: number; month: number; day: number },
   metaDiaria = 5,
-  metaMensual = 150
+  metaMensual = 130
 ): AgilizadorMeta {
   const nombreUpper = nombreAgilizador.trim().toUpperCase();
   const suyos = allRows.filter((r) => r.agilizador.trim().toUpperCase() === nombreUpper);
