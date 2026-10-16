@@ -5,6 +5,7 @@ import { formatBogotaDateTime } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
 import RangoEditor from './rango-editor';
+import RefreshButton from './refresh-button';
 
 // Estas dos viven en su propia fila editable (RangoEditor) — no se
 // duplican en la tabla informativa de abajo.
@@ -18,7 +19,12 @@ export default async function ConfiguracionPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Configuración" title="Parámetros de la" accent="automatización" />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader eyebrow="Configuración" title="Parámetros de la" accent="automatización" />
+        <div className="mb-6">
+          <RefreshButton />
+        </div>
+      </div>
       <ConfigTabs />
 
       <div className="panel-card max-w-xl rounded-xl p-5">
