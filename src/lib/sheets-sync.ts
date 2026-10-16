@@ -23,6 +23,18 @@ function getSpreadsheetId() {
   return id;
 }
 
+// A, B, ..., Z, AA, AB, ... — letra de columna A1 a partir de un índice 0-based.
+function colLetter(index: number): string {
+  let i = index + 1;
+  let s = '';
+  while (i > 0) {
+    const r = (i - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    i = Math.floor((i - 1) / 26);
+  }
+  return s;
+}
+
 export type SyncResult = { nuevos: number; actualizados: number; total: number };
 
 export async function syncServicesFromDb({
@@ -35,9 +47,13 @@ export async function syncServicesFromDb({
   const spreadsheetId = getSpreadsheetId();
   const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
 
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_DATA}!A:DZ` });
-  const existingValues = existing.data.values || [];
-  const existingHeaders = existingValues[0] || [];
+  // Solo se necesitan ID Servicio y Estado de lo que ya hay — comparar
+  // contra eso decide qué es nuevo/cambió; la fila que se escribe siempre
+  // es la que viene de la BD completa, nunca la existente. Leer las 130
+  // columnas completas de ~84k filas (como antes) es lo que hacía que la
+  // función se pasara del límite de tiempo de Vercel.
+  const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_DATA}!1:1` });
+  const existingHeaders = headerRes.data.values?.[0] || [];
   const idColExisting = existingHeaders.indexOf('ID Servicio');
   const stateColExisting = existingHeaders.indexOf('Estado');
 
@@ -46,10 +62,21 @@ export async function syncServicesFromDb({
   const stateColIncoming = incomingHeaders.indexOf('Estado');
   if (idColIncoming < 0) throw new Error('No se encontró la columna "ID Servicio".');
 
-  const existingById = new Map<string, { rowNumber: number; values: string[] }>();
-  for (let r = 1; r < existingValues.length; r += 1) {
-    const id = existingValues[r][idColExisting];
-    if (id) existingById.set(String(id), { rowNumber: r + 1, values: existingValues[r] });
+  const existingById = new Map<string, { rowNumber: number; estado: string }>();
+  let sheetIsEmpty = true;
+  if (idColExisting >= 0) {
+    const idLetter = colLetter(idColExisting);
+    const stateLetter = stateColExisting >= 0 ? colLetter(stateColExisting) : null;
+    const ranges = [`${SHEET_DATA}!${idLetter}2:${idLetter}`];
+    if (stateLetter) ranges.push(`${SHEET_DATA}!${stateLetter}2:${stateLetter}`);
+    const idStateRes = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges });
+    const idRows = idStateRes.data.valueRanges?.[0]?.values || [];
+    const stateRows = stateLetter ? idStateRes.data.valueRanges?.[1]?.values || [] : [];
+    sheetIsEmpty = idRows.length === 0;
+    for (let r = 0; r < idRows.length; r += 1) {
+      const id = idRows[r]?.[0];
+      if (id) existingById.set(String(id), { rowNumber: r + 2, estado: String(stateRows[r]?.[0] ?? '') });
+    }
   }
 
   const now = new Date().toISOString();
@@ -67,13 +94,13 @@ export async function syncServicesFromDb({
     if (!found) {
       newRows.push(row);
       historyRows.push([now, id, '(nuevo)', newState, 'Panel (manual)', 'OK']);
-    } else if (stateColExisting >= 0 && String(found.values[stateColExisting]) !== String(newState)) {
+    } else if (stateColExisting >= 0 && found.estado !== String(newState)) {
       updates.push({ rowNumber: found.rowNumber, values: row });
-      historyRows.push([now, id, found.values[stateColExisting], newState, 'Panel (manual)', 'OK']);
+      historyRows.push([now, id, found.estado, newState, 'Panel (manual)', 'OK']);
     }
   }
 
-  if (existingValues.length === 0) {
+  if (sheetIsEmpty) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${SHEET_DATA}!A1`,
