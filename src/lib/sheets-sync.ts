@@ -35,7 +35,7 @@ export async function syncServicesFromDb({
   const spreadsheetId = getSpreadsheetId();
   const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
 
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_DATA}!A:ZZ` });
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_DATA}!A:DZ` });
   const existingValues = existing.data.values || [];
   const existingHeaders = existingValues[0] || [];
   const idColExisting = existingHeaders.indexOf('ID Servicio');

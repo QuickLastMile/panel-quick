@@ -7,6 +7,11 @@ import ConfigTabs from '@/components/config-tabs';
 import RangoEditor from './rango-editor';
 import RefreshButton from './refresh-button';
 
+// El botón "Actualizar ahora" lee toda la hoja (A:ZZ) para comparar y
+// escribir — con el límite por defecto (10s en plan Hobby) Vercel corta la
+// función a medias y el botón se queda pegado en "Actualizando...".
+export const maxDuration = 60;
+
 // Estas dos viven en su propia fila editable (RangoEditor) — no se
 // duplican en la tabla informativa de abajo.
 const HIDDEN_LABELS = new Set(['Días hacia atrás', 'Días hacia adelante']);

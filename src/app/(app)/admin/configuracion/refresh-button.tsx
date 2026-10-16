@@ -13,15 +13,20 @@ export default function RefreshButton() {
   async function handleClick() {
     setLoading(true);
     setMessage(null);
-    const res = await refreshNow();
-    setLoading(false);
-    if (res.error) {
-      setMessage({ type: 'error', text: res.error });
-      return;
+    try {
+      const res = await refreshNow();
+      if (res.error) {
+        setMessage({ type: 'error', text: res.error });
+        return;
+      }
+      const r = res.result!;
+      setMessage({ type: 'ok', text: `Listo — ${r.nuevos} nuevos, ${r.actualizados} actualizados (${r.total} servicios revisados).` });
+      router.refresh();
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Falló la actualización (sin más detalle).' });
+    } finally {
+      setLoading(false);
     }
-    const r = res.result!;
-    setMessage({ type: 'ok', text: `Listo — ${r.nuevos} nuevos, ${r.actualizados} actualizados (${r.total} servicios revisados).` });
-    router.refresh();
   }
 
   return (
