@@ -26,12 +26,25 @@ const up = (s: string) => s.toUpperCase();
 
 const REGISTRO_PUBLICO_PATH = '/registro-colaborador';
 
-// Colores de fila según estado del colaborador:
-// rojo = inactivo · naranja = alerta (5+ días sin gestión) · verde = ya
-// gestiona (y no está en alerta) · azul = activo, nuevo, aún sin gestionar.
+// "Sin gestión" no es un solo caso — hay dos muy distintos:
+//   · nunca tomó un servicio (totalGestiones === 0)
+//   · sí gestionó antes, pero dejó de tomar servicios (totalGestiones > 0)
+// Colores de fila:
+//   rojo = inactivo
+//   verde = gestionando (tiene servicios, al día)
+//   azul = nuevo, aún sin gestionar (dentro del plazo de gracia)
+//   naranja = NUNCA ha gestionado y ya pasó el plazo (alerta)
+//   morado = YA gestionó pero dejó de tomar servicios (alerta)
+function alertaTipo(r: Row): 'ninguna' | 'nunca-gestiono' | 'dejo-gestionar' {
+  if (r.diasSinServicio === null || r.diasSinServicio < ALERT_DIAS) return 'ninguna';
+  return r.totalGestiones === 0 ? 'nunca-gestiono' : 'dejo-gestionar';
+}
+
 function rowTint(r: Row): string {
   if (r.estado === 'INACTIVO') return 'bg-red-500/[0.06] hover:bg-red-500/[0.1]';
-  if (r.diasSinServicio !== null && r.diasSinServicio >= ALERT_DIAS) return 'bg-amber-500/[0.07] hover:bg-amber-500/[0.12]';
+  const alerta = alertaTipo(r);
+  if (alerta === 'nunca-gestiono') return 'bg-amber-500/[0.07] hover:bg-amber-500/[0.12]';
+  if (alerta === 'dejo-gestionar') return 'bg-violet-500/[0.08] hover:bg-violet-500/[0.13]';
   if (r.totalGestiones > 0) return 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.1]';
   return 'bg-sky-500/[0.06] hover:bg-sky-500/[0.1]';
 }
@@ -413,7 +426,7 @@ function ColaboradorDetailPanel({ row, onClose }: { row: Row | null; onClose: ()
             </div>
             <div className="panel-card rounded-xl p-4">
               <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Días sin gestionar</p>
-              <p className={`mt-1 text-2xl font-bold tabular-nums ${row.diasSinServicio !== null && row.diasSinServicio >= ALERT_DIAS ? 'text-amber-400' : 'text-[var(--text)]'}`}>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${alertaTipo(row) === 'nunca-gestiono' ? 'text-amber-400' : alertaTipo(row) === 'dejo-gestionar' ? 'text-violet-400' : 'text-[var(--text)]'}`}>
                 {row.diasSinServicio ?? '—'}
               </p>
             </div>
@@ -470,7 +483,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
   const router = useRouter();
   const [estadoTab, setEstadoTab] = useState<'activo' | 'inactivo'>('activo');
   const [gestionFiltro, setGestionFiltro] = useState<'todos' | 'gestionando' | 'sin-gestionar'>('todos');
-  const [soloAlertas, setSoloAlertas] = useState(false);
+  const [alertaFiltro, setAlertaFiltro] = useState<'todas' | 'nunca-gestiono' | 'dejo-gestionar'>('todas');
   const [search, setSearch] = useState('');
   const [formModal, setFormModal] = useState<{ id?: number; initial: Partial<ColaboradorInput> } | null>(null);
   const [inactivarRow, setInactivarRow] = useState<Row | null>(null);
@@ -494,15 +507,15 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
 
   const activos = colaboradores.filter((c) => c.estado === 'ACTIVO');
   const inactivos = colaboradores.filter((c) => c.estado === 'INACTIVO');
-  const sinGestionar = activos.filter((c) => c.totalGestiones === 0);
-  const alertas = activos.filter((c) => c.diasSinServicio !== null && c.diasSinServicio >= ALERT_DIAS);
+  const nuncaGestionaron = activos.filter((c) => alertaTipo(c) === 'nunca-gestiono');
+  const dejaronDeGestionar = activos.filter((c) => alertaTipo(c) === 'dejo-gestionar');
 
   const base = estadoTab === 'activo' ? activos : inactivos;
 
   const filtered = useMemo(() => {
     let r = base;
     if (estadoTab === 'activo') {
-      if (soloAlertas) r = r.filter((c) => c.diasSinServicio !== null && c.diasSinServicio >= ALERT_DIAS);
+      if (alertaFiltro !== 'todas') r = r.filter((c) => alertaTipo(c) === alertaFiltro);
       if (gestionFiltro === 'gestionando') r = r.filter((c) => c.totalGestiones > 0);
       if (gestionFiltro === 'sin-gestionar') r = r.filter((c) => c.totalGestiones === 0);
     }
@@ -511,7 +524,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
       r = r.filter((c) => `${c.nombreCompleto} ${c.identificacion} ${c.ciudad} ${c.agilizador}`.toLowerCase().includes(q));
     }
     return r;
-  }, [base, estadoTab, soloAlertas, gestionFiltro, search]);
+  }, [base, estadoTab, alertaFiltro, gestionFiltro, search]);
 
   async function handleReactivar(row: Row) {
     setTogglingId(row.id);
@@ -522,8 +535,8 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('todos'); setSoloAlertas(false); }} className="panel-card rounded-xl p-4 text-left transition-colors hover:border-[var(--border-strong)]">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('todos'); setAlertaFiltro('todas'); }} className="panel-card rounded-xl p-4 text-left transition-colors hover:border-[var(--border-strong)]">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Activos</p>
           <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{activos.length}</p>
         </button>
@@ -531,15 +544,21 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Inactivos</p>
           <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{inactivos.length}</p>
         </button>
-        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('sin-gestionar'); setSoloAlertas(false); }} className="panel-card rounded-xl p-4 text-left transition-colors hover:border-[var(--border-strong)]">
+        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('sin-gestionar'); setAlertaFiltro('todas'); }} className="panel-card rounded-xl p-4 text-left transition-colors hover:border-[var(--border-strong)]">
           <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Nunca han gestionado</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{sinGestionar.length}</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--text)] tabular-nums">{activos.filter((c) => c.totalGestiones === 0).length}</p>
         </button>
-        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('todos'); setSoloAlertas(true); }} className="panel-card rounded-xl border-amber-700/40 p-4 text-left transition-colors hover:border-amber-500">
+        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('todos'); setAlertaFiltro('nunca-gestiono'); }} className="panel-card rounded-xl border-amber-700/40 p-4 text-left transition-colors hover:border-amber-500">
           <p className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-amber-400">
-            <AlertTriangle size={12} /> {ALERT_DIAS}+ días sin servicio
+            <AlertTriangle size={12} /> Nunca gestionaron ({ALERT_DIAS}+ d)
           </p>
-          <p className="mt-1 text-2xl font-bold text-amber-400 tabular-nums">{alertas.length}</p>
+          <p className="mt-1 text-2xl font-bold text-amber-400 tabular-nums">{nuncaGestionaron.length}</p>
+        </button>
+        <button onClick={() => { setEstadoTab('activo'); setGestionFiltro('todos'); setAlertaFiltro('dejo-gestionar'); }} className="panel-card rounded-xl border-violet-700/40 p-4 text-left transition-colors hover:border-violet-500">
+          <p className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-violet-400">
+            <AlertTriangle size={12} /> Dejaron de gestionar ({ALERT_DIAS}+ d)
+          </p>
+          <p className="mt-1 text-2xl font-bold text-violet-400 tabular-nums">{dejaronDeGestionar.length}</p>
         </button>
       </div>
 
@@ -590,9 +609,17 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                 <option value="sin-gestionar">Nunca han gestionado</option>
               </select>
             </label>
-            <label className="flex items-center gap-1.5 self-center text-xs font-semibold text-[var(--text-secondary)]">
-              <input type="checkbox" checked={soloAlertas} onChange={(e) => setSoloAlertas(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--accent)]" />
-              Solo alertas ({ALERT_DIAS}+ días sin servicio)
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Alerta ({ALERT_DIAS}+ días)</span>
+              <select
+                value={alertaFiltro}
+                onChange={(e) => setAlertaFiltro(e.target.value as typeof alertaFiltro)}
+                className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+              >
+                <option value="todas">Todas</option>
+                <option value="nunca-gestiono">Nunca gestionaron</option>
+                <option value="dejo-gestionar">Dejaron de gestionar</option>
+              </select>
             </label>
           </>
         )}
@@ -605,9 +632,10 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
       </div>
 
       <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" /> Ya gestiona</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" /> Gestionando</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500/60" /> Nuevo, aún sin gestionar</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> {ALERT_DIAS}+ días sin gestionar</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> Nunca gestionó ({ALERT_DIAS}+ d)</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500/60" /> Dejó de gestionar ({ALERT_DIAS}+ d)</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500/60" /> Inactivo</span>
       </div>
 
@@ -654,7 +682,15 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                       {r.diasSinServicio === null ? (
                         '—'
                       ) : (
-                        <span className={r.diasSinServicio >= ALERT_DIAS && r.estado === 'ACTIVO' ? 'font-bold text-amber-400' : 'text-[var(--text-secondary)]'}>
+                        <span
+                          className={
+                            alertaTipo(r) === 'nunca-gestiono'
+                              ? 'font-bold text-amber-400'
+                              : alertaTipo(r) === 'dejo-gestionar'
+                                ? 'font-bold text-violet-400'
+                                : 'text-[var(--text-secondary)]'
+                          }
+                        >
                           {r.diasSinServicio}
                         </span>
                       )}
