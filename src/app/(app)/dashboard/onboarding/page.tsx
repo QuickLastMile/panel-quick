@@ -1,6 +1,6 @@
 import { getOnboardingSnapshot } from '@/lib/onboarding';
 import { buildOnboardingKpis } from '@/lib/onboarding-aggregate';
-import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, isToday, bogotaYesterday } from '@/lib/date-filter';
+import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, isToday } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -15,10 +15,10 @@ export default async function OnboardingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireRole(['admin', 'supervisor', 'onboarding']);
-  // Esta pestaña arranca en el día de AYER por defecto (no "hoy") — la data
-  // de Onboarding se actualiza con un día de rezago, así que "hoy" suele
-  // verse vacío.
-  const filter = parseDateFilterParams(await searchParams, bogotaYesterday());
+  // Arranca en el día de HOY — ahora los datos de Onboarding vienen de la
+  // misma base en vivo que Vinculación, no hay rezago de un día como
+  // cuando se leía del Sheet.
+  const filter = parseDateFilterParams(await searchParams);
 
   const { rows: allRows } = await getOnboardingSnapshot();
 

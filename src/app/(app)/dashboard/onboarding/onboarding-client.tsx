@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Users, CalendarCheck, TrendingUp, MapPin, Target, Award, Percent } from 'lucide-react';
 import type { VinculacionRow } from '@/lib/onboarding';
 import { buildOnboardingData, buildAgilizadorMeta, isActivoWorker, type OnboardingKpis } from '@/lib/onboarding-aggregate';
-import { bogotaToday, bogotaYesterday, formatMonthLabel } from '@/lib/date-filter';
+import { bogotaToday, formatMonthLabel } from '@/lib/date-filter';
 import StatCard from '@/components/stat-card';
 import ChartCard from '@/components/charts/chart-card';
 import RankingBarList from '@/components/charts/ranking-bar-list';
@@ -42,10 +42,10 @@ export default function OnboardingClient({
 
   // Filtros propios del bloque "Meta de vinculación" — desconectados del
   // filtro general de la página y entre sí (día para "Hoy", mes para "Este
-  // mes"). Arranca igual que el resto de la pestaña: día = ayer, mes = el
+  // mes"). Arranca igual que el resto de la pestaña: día = hoy, mes = el
   // mes real en curso.
   const todayReal = bogotaToday();
-  const [zDay, setZDay] = useState(bogotaYesterday());
+  const [zDay, setZDay] = useState(todayReal);
   const [zMonth, setZMonth] = useState({ year: todayReal.year, month: todayReal.month });
   const isZDayToday = zDay.year === todayReal.year && zDay.month === todayReal.month && zDay.day === todayReal.day;
   const isZMonthCurrent = zMonth.year === todayReal.year && zMonth.month === todayReal.month;
@@ -266,7 +266,7 @@ export default function OnboardingClient({
         )}
       </ChartCard>
 
-      <ChartCard title="Vinculaciones por tipo de vinculación" description='Columna "MEDIO DE VINCULACIÓN" — cómo llegó cada colaborador.' className="mb-5">
+      <ChartCard title="Vinculaciones por tipo" description='Columna "MEDIO DE VINCULACIÓN" — cómo llegó cada colaborador.' className="mb-5">
         {data.porMedioVinculacion.length ? (
           <RankingBarList items={data.porMedioVinculacion} showPercent />
         ) : (

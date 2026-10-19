@@ -4,9 +4,15 @@ import { parseFechaSolicitud, daysBetween, type SimpleDate } from './date-filter
 const SIN_CLASIFICAR = new Set(['OTRO', 'OTROS', 'NN']);
 const TERMINAL = new Set(['Finalizado', 'Cancelado']);
 // "DESCARTAR" son filas que no cuentan para este análisis (la fuente las
-// marca así); "#N/A" es un error de fórmula en el Sheet, no una categoría
-// real — ninguna de las dos debe aparecer en las gráficas de asignador.
-const EXCLUDE_TIPO_ASIGNADOR = new Set(['DESCARTAR', '#N/A']);
+// marca así). Un VLOOKUP sin match en el Sheet no guarda solo "#N/A": guarda
+// el mensaje completo del error ("#N/A (Did not find value 'X' in VLOOKUP
+// evaluation.)"), distinto para cada persona sin clasificar — por eso NO se
+// puede comparar con .has() (igualdad exacta), hay que usar startsWith.
+const EXCLUDE_TIPO_ASIGNADOR_EXACT = new Set(['DESCARTAR']);
+function isExcludedTipoAsignador(value: string): boolean {
+  const upper = value.toUpperCase();
+  return EXCLUDE_TIPO_ASIGNADOR_EXACT.has(upper) || upper.startsWith('#N/A');
+}
 
 export function isSinClasificar(value: string): boolean {
   return SIN_CLASIFICAR.has(value.toUpperCase());
@@ -228,7 +234,7 @@ export function buildTipoAsignadorTrend(rows: ServiceRow[]): TipoAsignadorTrend 
 
   rows.forEach((r) => {
     if (SIN_CLASIFICAR.has(r.proyecto.toUpperCase())) return;
-    if (!r.tipoAsignador || EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) return;
+    if (!r.tipoAsignador || isExcludedTipoAsignador(r.tipoAsignador)) return;
     if (!r.anioSolicitud || !r.mesNumSolicitud) return;
     const mesKey = `${r.anioSolicitud}-${pad2(r.mesNumSolicitud)}`;
     const mesLabel = `${r.mesSolicitud} ${r.anioSolicitud}`;
@@ -310,7 +316,7 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
       const tipo = upper === 'DOMICILIO' || upper === 'MENSAJERIA' || upper === 'MENSAJERÍA' ? 'Mensajería' : r.tipoServicio;
       bump(porTipoServicioMap, tipo);
     }
-    if (r.tipoAsignador && !EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) bump(porTipoAsignadorMap, r.tipoAsignador);
+    if (r.tipoAsignador && !isExcludedTipoAsignador(r.tipoAsignador)) bump(porTipoAsignadorMap, r.tipoAsignador);
     const j = r.jefatura.trim();
     if (j && !SIN_CLASIFICAR.has(j.toUpperCase())) bump(porJefaturaMap, j);
     if (normEstado(r.estado) === 'Cancelado') bump(porMotivoCancelacionMap, normalizeMotivoCancelacion(r.razonCancelacion));
@@ -325,7 +331,7 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     if (!r.fechaHoraAsignado) return;
     const h = parseHour(r.horaAsignacion);
     if (h === null) return;
-    if (!r.tipoAsignador || EXCLUDE_TIPO_ASIGNADOR.has(r.tipoAsignador.toUpperCase())) return;
+    if (!r.tipoAsignador || isExcludedTipoAsignador(r.tipoAsignador)) return;
     // El gestor va en la clave para poder filtrar esta gráfica por
     // asignador puntual sin tener que mandar las filas crudas al cliente.
     const key = `${h}|||${r.tipoAsignador}|||${r.gestor}`;
