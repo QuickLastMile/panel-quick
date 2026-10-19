@@ -20,7 +20,7 @@ export default function ConfigTabs() {
           <Link
             key={t.href}
             href={t.href}
-            className={`rounded-lg border px-3 py-2 text-xs font-bold transition-all duration-150 ${
+            className={`rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
               active
                 ? 'border-[var(--accent)] bg-gradient-gold text-[#141008] shadow-[0_0_14px_rgba(214,164,25,0.22)]'
                 : 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text)]'

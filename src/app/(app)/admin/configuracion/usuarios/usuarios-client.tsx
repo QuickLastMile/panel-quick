@@ -6,7 +6,7 @@ import { Plus, Eye, EyeOff, X, ShieldCheck, ShieldOff, KeyRound } from 'lucide-r
 import { createPortal } from 'react-dom';
 import type { Usuario } from '@/lib/usuarios-types';
 import { ROLE_LABEL, type Role } from '@/lib/auth';
-import { createUsuarioAction, toggleUsuarioActivoAction, setUsuarioPasswordAction } from './actions';
+import { createUsuarioAction, toggleUsuarioActivoAction, setUsuarioPasswordAction, setUsuarioRolAction } from './actions';
 
 const inputCls =
   'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]';
@@ -256,11 +256,20 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [togglingEmail, setTogglingEmail] = useState<string | null>(null);
   const [passwordModalUser, setPasswordModalUser] = useState<Usuario | null>(null);
+  const [changingRolEmail, setChangingRolEmail] = useState<string | null>(null);
 
   async function handleToggle(u: Usuario) {
     setTogglingEmail(u.email);
     await toggleUsuarioActivoAction(u.email, !u.activo);
     setTogglingEmail(null);
+    router.refresh();
+  }
+
+  async function handleRolChange(u: Usuario, rol: Role) {
+    if (rol === u.rol) return;
+    setChangingRolEmail(u.email);
+    await setUsuarioRolAction(u.email, rol);
+    setChangingRolEmail(null);
     router.refresh();
   }
 
@@ -304,7 +313,20 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
                 <tr key={u.email} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                   <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{u.email}</td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{u.nombre}</td>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{ROLE_LABEL[u.rol]}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5">
+                    <select
+                      value={u.rol}
+                      disabled={changingRolEmail === u.email}
+                      onChange={(e) => handleRolChange(u, e.target.value as Role)}
+                      className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)] outline-none transition-colors focus:border-[var(--accent)] disabled:opacity-50"
+                    >
+                      {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-2.5">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${

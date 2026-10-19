@@ -50,7 +50,7 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
       <div className="flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)] p-1">
         <button
           onClick={() => push({ mode: 'day' })}
-          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+          className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
             filter.mode === 'day'
               ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -67,7 +67,7 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
               endDay: filter.day,
             })
           }
-          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+          className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
             filter.mode === 'range'
               ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -77,7 +77,7 @@ export default function DateFilterBar({ filter }: { filter: DateFilter }) {
         </button>
         <button
           onClick={() => push({ mode: 'month' })}
-          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+          className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
             filter.mode === 'month'
               ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text)]'

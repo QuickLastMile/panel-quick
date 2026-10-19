@@ -19,6 +19,8 @@ export type VinculacionRow = {
   estadoWorker: string;
   ciudad: string;
   vehiculo: string;
+  // Referido / trabajo de campo / redes sociales / Approval.
+  medioVinculacion: string;
   // Quien hizo la vinculación.
   agilizador: string;
   ultimoServicio: string;
@@ -61,6 +63,7 @@ function toVinculacionRow(c: ColaboradorRow): VinculacionRow {
     estadoWorker: c.estado,
     ciudad: c.ciudad,
     vehiculo: c.tipoVehiculo,
+    medioVinculacion: c.medioVinculacion,
     agilizador: c.agilizador,
     ultimoServicio: c.ultimoServicio,
     cantFinalizados: c.cantFinalizados,

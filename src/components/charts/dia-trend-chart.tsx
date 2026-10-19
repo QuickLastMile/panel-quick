@@ -89,7 +89,7 @@ export default function DiaTrendChart({
         <div className="flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)] p-1">
           <button
             onClick={() => setModo('estado')}
-            className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
               modo === 'estado'
                 ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -99,7 +99,7 @@ export default function DiaTrendChart({
           </button>
           <button
             onClick={() => setModo('total')}
-            className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
               modo === 'total'
                 ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'

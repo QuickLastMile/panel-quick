@@ -22,6 +22,7 @@ export type OnboardingData = {
   porAgilizador: { key: string; count: number }[];
   porCiudad: { key: string; count: number }[];
   porVehiculo: { key: string; count: number }[];
+  porMedioVinculacion: { key: string; count: number }[];
   diaVinculacion: DiaVinculacionPoint[];
   mesVinculacion: MesVinculacionPoint[];
   // "SIN GESTIÓN" / "PRIMER SERVICIO NO EFECTIVO" / "GESTIONANDO" — tal cual
@@ -46,6 +47,7 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
   const porAgilizadorMap: Record<string, number> = {};
   const porCiudadMap: Record<string, number> = {};
   const porVehiculoMap: Record<string, number> = {};
+  const porMedioVinculacionMap: Record<string, number> = {};
   const porGestionStatusMap: Record<string, number> = {};
   const diaMap: Record<string, { mes: string; mesLabel: string; count: number }> = {};
   const mesMap: Record<string, { mesLabel: string; count: number }> = {};
@@ -56,6 +58,7 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
     if (r.agilizador) bump(porAgilizadorMap, r.agilizador);
     if (r.ciudad) bump(porCiudadMap, r.ciudad);
     if (r.vehiculo) bump(porVehiculoMap, r.vehiculo);
+    if (r.medioVinculacion) bump(porMedioVinculacionMap, r.medioVinculacion);
     const estadoGestion = r.gestionStatus || SIN_GESTION;
     bump(porGestionStatusMap, estadoGestion);
     if (estadoGestion === SIN_GESTION) sinGestion += 1;
@@ -94,6 +97,7 @@ export function buildOnboardingData(rows: VinculacionRow[]): OnboardingData {
     porAgilizador: toPairs(porAgilizadorMap),
     porCiudad: toPairs(porCiudadMap),
     porVehiculo: toPairs(porVehiculoMap),
+    porMedioVinculacion: toPairs(porMedioVinculacionMap),
     diaVinculacion,
     mesVinculacion,
     porGestionStatus: toPairs(porGestionStatusMap),

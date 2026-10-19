@@ -462,7 +462,7 @@ function ColaboradorDetailPanel({ row, onClose }: { row: Row | null; onClose: ()
 }
 
 const tabBtnCls = (active: boolean) =>
-  `rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+  `rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
     active ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
   }`;
 

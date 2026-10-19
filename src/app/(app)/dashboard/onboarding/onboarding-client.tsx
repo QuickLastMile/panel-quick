@@ -266,6 +266,14 @@ export default function OnboardingClient({
         )}
       </ChartCard>
 
+      <ChartCard title="Vinculaciones por tipo de vinculación" description='Columna "MEDIO DE VINCULACIÓN" — cómo llegó cada colaborador.' className="mb-5">
+        {data.porMedioVinculacion.length ? (
+          <RankingBarList items={data.porMedioVinculacion} showPercent />
+        ) : (
+          <p className="py-8 text-center text-sm text-[var(--text-muted)]">Sin vinculaciones para esta fecha.</p>
+        )}
+      </ChartCard>
+
       <ChartCard title="Vinculaciones por mes" description='Columna "FECHA VINCULACION" — histórico completo, independiente del filtro de arriba.' className="mb-5">
         {mesPoints.length ? (
           <BarTrendChart points={mesPoints} />

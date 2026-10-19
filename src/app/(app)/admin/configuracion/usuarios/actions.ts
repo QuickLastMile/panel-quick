@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireRole } from '@/lib/session';
-import { createUsuario, setUsuarioActivo, setUsuarioPassword } from '@/lib/usuarios';
+import { createUsuario, setUsuarioActivo, setUsuarioPassword, setUsuarioRol } from '@/lib/usuarios';
 import type { Role } from '@/lib/auth';
 
 export async function createUsuarioAction(data: {
@@ -27,6 +27,17 @@ export async function toggleUsuarioActivoAction(email: string, activo: boolean):
     await setUsuarioActivo(email, activo);
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No se pudo actualizar el usuario.' };
+  }
+  revalidatePath('/admin/configuracion/usuarios');
+  return {};
+}
+
+export async function setUsuarioRolAction(email: string, rol: Role): Promise<{ error?: string }> {
+  await requireRole(['admin']);
+  try {
+    await setUsuarioRol(email, rol);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No se pudo cambiar el rol.' };
   }
   revalidatePath('/admin/configuracion/usuarios');
   return {};

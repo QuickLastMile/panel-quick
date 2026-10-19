@@ -271,7 +271,7 @@ export default function GestoresClient({
         <div className="mb-4 flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)] p-1 w-fit">
           <button
             onClick={() => setGestorView('cantidad')}
-            className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
               gestorView === 'cantidad'
                 ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -281,7 +281,7 @@ export default function GestoresClient({
           </button>
           <button
             onClick={() => setGestorView('tiempo')}
-            className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
               gestorView === 'tiempo'
                 ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
