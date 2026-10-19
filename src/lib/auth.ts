@@ -4,7 +4,7 @@ export type Role = 'admin' | 'supervisor' | 'coordinador' | 'onboarding';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administrador',
-  supervisor: 'Supervisor',
+  supervisor: 'Liderazgo',
   coordinador: 'Coordinador / Gestor',
   onboarding: 'Agilizador (Onboarding)',
 };
