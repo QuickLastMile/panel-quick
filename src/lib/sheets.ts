@@ -1,6 +1,4 @@
-import { google } from 'googleapis';
-
-const SHEET_RANGE = 'Datos_Actuales!A:DZ';
+import { Pool } from 'pg';
 
 export type ServiceRow = {
   id: string;
@@ -53,129 +51,108 @@ export type ServiceRow = {
   minutosAsignacion: number | null;
 };
 
-function getAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  const credentials = JSON.parse(raw);
-  return new google.auth.GoogleAuth({
-    credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-}
-
 export type SheetsSnapshot = {
   rows: ServiceRow[];
-  // Hora real de la última sincronización exitosa con Quick (la escribe la
-  // automatización en Resumen!B1) — distinta de "cuándo se renderizó esta
-  // página". Null si nunca ha corrido o la celda está vacía.
+  // Momento real del dato más reciente sincronizado por la automatización
+  // (max(updated_at) en la tabla) — distinta de "cuándo se renderizó esta
+  // página". Null si la tabla está vacía.
   lastSyncedAt: string | null;
 };
 
-async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
-  const spreadsheetId = process.env.MONITOREO_SHEET_ID;
-  if (!spreadsheetId) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
-
-  const sheets = google.sheets({ version: 'v4', auth: getAuth() });
-  const res = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId,
-    // H1 (no B1: esa es parte de la celda combinada del título y nunca se
-    // puede leer de vuelta) — ver automation/lib/sheets.mjs.
-    ranges: [SHEET_RANGE, 'Resumen!H1'],
-    valueRenderOption: 'UNFORMATTED_VALUE',
-    dateTimeRenderOption: 'FORMATTED_STRING',
+// Supavisor en modo transacción (puerto 6543): recomendado por Vercel para
+// funciones serverless — muchas conexiones cortas en vez de una sesión
+// larga. Un solo Pool a nivel de módulo se reutiliza entre invocaciones
+// mientras la instancia de Vercel siga caliente.
+let pool: Pool | null = null;
+function getPool(): Pool {
+  if (pool) return pool;
+  const host = process.env.SUPA_DB_HOST;
+  const port = process.env.SUPA_DB_PORT;
+  const user = process.env.SUPA_DB_USER;
+  const password = process.env.SUPA_DB_PASSWORD;
+  if (!host || !port || !user || !password) {
+    throw new Error('Faltan las variables SUPA_DB_* en las variables de entorno.');
+  }
+  pool = new Pool({
+    host,
+    port: Number(port),
+    user,
+    password,
+    database: process.env.SUPA_DB_NAME || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+    query_timeout: 30000,
+    max: 5,
+    idleTimeoutMillis: 10000,
   });
+  return pool;
+}
 
-  const [dataRange, syncRange] = res.data.valueRanges || [];
-  const lastSyncedAt = String(syncRange?.values?.[0]?.[0] || '') || null;
+const toNum = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const toStr = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
 
-  const values = dataRange?.values || [];
-  if (values.length < 2) return { rows: [], lastSyncedAt };
-  const headers = values[0] as string[];
-  const idx = (name: string) => headers.indexOf(name);
+async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
+  const db = getPool();
 
-  const COLS = {
-    id: idx('ID Servicio'),
-    proyecto: idx('PROYECTO'),
-    gestor: idx('GESTOR'),
-    cargoGestor: idx('CARGO GESTOR'),
-    estado: idx('Estado'),
-    ciudad: idx('Ciudad'),
-    direccion: idx('Dirección de Origen'),
-    nombreTrabajador: idx('Nombre Trabajador'),
-    identTrabajador: idx('Ident. Trabajador'),
-    placa: idx('Placa'),
-    razonCancelacion: idx('Razon de Cancelacion'),
-    descCancelacion: idx('Descripcion de Cancelacion'),
-    usuarioCancelacion: idx('Usuario Cancelación'),
-    usuarioAsignacion: idx('Usuario Asignación'),
-    diaSolicitud: idx('DÍA SOLICITUD'),
-    anioSolicitud: idx('AÑO SOLICITUD'),
-    mesNumSolicitud: idx('MES # SOLICITUD'),
-    mesSolicitud: idx('MES SOLICITUD'),
-    fechaSolicitud: idx('FECHA SOLICITUD'),
-    horaServicio: idx('HORA DE SERVICIO'),
-    fechaCreacion: idx('FECHA CREACIÓN'),
-    horaCreacion: idx('HORA DE CREACIÓN'),
-    jefatura: idx('JEFATURA'),
-    servicio: idx('Servicio'),
-    tipoServicio: idx('Tipo de Servicio'),
-    valorDeclarado: idx('Valor Declarado'),
-    precioTotal: idx('Precio Total'),
-    ganancias: idx('Ganancias'),
-    zona: idx('Zona'),
-    email: idx('Email'),
-    descripcion: idx('Descripcion'),
-    diasAnticipadosCreacion: idx('DÍAS ANTICIPADAS DE CREACIÓN'),
-    fechaHoraAsignado: idx('Fecha Hora Asignado'),
-    tipoAsignador: idx('TIPO ASIGNADOR'),
-    horaAsignacion: idx('HORA ASIGNACIÓN'),
-    minutosAsignacion: idx('Minutos Tiempo Asignado'),
-  };
+  const [dataRes, syncRes] = await Promise.all([
+    db.query(
+      `SELECT id, proyecto, gestor, cargo_gestor, estado, ciudad, direccion,
+              nombre_trabajador, ident_trabajador, placa, razon_cancelacion,
+              desc_cancelacion, usuario_cancelacion, usuario_asignacion,
+              dia_solicitud, anio_solicitud, mes_num_solicitud, mes_solicitud,
+              fecha_solicitud, hora_servicio, fecha_creacion, hora_creacion,
+              jefatura, servicio, tipo_servicio, valor_declarado, precio_total,
+              ganancias, zona, email, descripcion, dias_anticipados_creacion,
+              fecha_hora_asignado, tipo_asignador, hora_asignacion, minutos_asignacion
+       FROM public.services`
+    ),
+    db.query(`SELECT max(updated_at) AS last FROM public.services`),
+  ]);
 
-  const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
-  const getNum = (row: unknown[], i: number) => {
-    const n = Number(get(row, i));
-    return Number.isFinite(n) && get(row, i) !== '' ? n : null;
-  };
+  const lastSyncedAt = syncRes.rows[0]?.last ? new Date(syncRes.rows[0].last).toISOString() : null;
 
-  const rows = (values.slice(1) as unknown[][])
-    .map((row) => ({
-      id: String(get(row, COLS.id)),
-      proyecto: String(get(row, COLS.proyecto) || 'SIN PROYECTO'),
-      gestor: String(get(row, COLS.gestor) || 'SIN GESTOR'),
-      cargoGestor: String(get(row, COLS.cargoGestor) || ''),
-      estado: String(get(row, COLS.estado) || 'Sin estado'),
-      ciudad: String(get(row, COLS.ciudad) || 'SIN CIUDAD'),
-      direccion: String(get(row, COLS.direccion) || ''),
-      nombreTrabajador: String(get(row, COLS.nombreTrabajador) || '').trim(),
-      identTrabajador: String(get(row, COLS.identTrabajador) || '').trim(),
-      placa: String(get(row, COLS.placa) || '').trim(),
-      razonCancelacion: String(get(row, COLS.razonCancelacion) || ''),
-      descCancelacion: String(get(row, COLS.descCancelacion) || ''),
-      usuarioCancelacion: String(get(row, COLS.usuarioCancelacion) || ''),
-      usuarioAsignacion: String(get(row, COLS.usuarioAsignacion) || ''),
-      diaSolicitud: Number(get(row, COLS.diaSolicitud)) || null,
-      anioSolicitud: Number(get(row, COLS.anioSolicitud)) || null,
-      mesNumSolicitud: Number(get(row, COLS.mesNumSolicitud)) || null,
-      mesSolicitud: String(get(row, COLS.mesSolicitud) || ''),
-      fechaSolicitud: String(get(row, COLS.fechaSolicitud) || ''),
-      horaServicio: String(get(row, COLS.horaServicio) || ''),
-      fechaCreacion: String(get(row, COLS.fechaCreacion) || ''),
-      horaCreacion: String(get(row, COLS.horaCreacion) || ''),
-      jefatura: String(get(row, COLS.jefatura) || '').trim(),
-      servicio: String(get(row, COLS.servicio) || ''),
-      tipoServicio: String(get(row, COLS.tipoServicio) || ''),
-      valorDeclarado: getNum(row, COLS.valorDeclarado),
-      precioTotal: getNum(row, COLS.precioTotal),
-      ganancias: getNum(row, COLS.ganancias),
-      zona: String(get(row, COLS.zona) || ''),
-      email: String(get(row, COLS.email) || ''),
-      descripcion: String(get(row, COLS.descripcion) || ''),
-      diasAnticipadosCreacion: getNum(row, COLS.diasAnticipadosCreacion),
-      fechaHoraAsignado: String(get(row, COLS.fechaHoraAsignado) || ''),
-      tipoAsignador: String(get(row, COLS.tipoAsignador) || ''),
-      horaAsignacion: String(get(row, COLS.horaAsignacion) || ''),
-      minutosAsignacion: getNum(row, COLS.minutosAsignacion),
+  const rows: ServiceRow[] = dataRes.rows
+    .map((r) => ({
+      id: toStr(r.id),
+      proyecto: toStr(r.proyecto) || 'SIN PROYECTO',
+      gestor: toStr(r.gestor) || 'SIN GESTOR',
+      cargoGestor: toStr(r.cargo_gestor),
+      estado: toStr(r.estado) || 'Sin estado',
+      ciudad: toStr(r.ciudad) || 'SIN CIUDAD',
+      direccion: toStr(r.direccion),
+      nombreTrabajador: toStr(r.nombre_trabajador).trim(),
+      identTrabajador: toStr(r.ident_trabajador).trim(),
+      placa: toStr(r.placa).trim(),
+      razonCancelacion: toStr(r.razon_cancelacion),
+      descCancelacion: toStr(r.desc_cancelacion),
+      usuarioCancelacion: toStr(r.usuario_cancelacion),
+      usuarioAsignacion: toStr(r.usuario_asignacion),
+      diaSolicitud: toNum(r.dia_solicitud),
+      anioSolicitud: toNum(r.anio_solicitud),
+      mesNumSolicitud: toNum(r.mes_num_solicitud),
+      mesSolicitud: toStr(r.mes_solicitud),
+      fechaSolicitud: toStr(r.fecha_solicitud),
+      horaServicio: toStr(r.hora_servicio),
+      fechaCreacion: toStr(r.fecha_creacion),
+      horaCreacion: toStr(r.hora_creacion),
+      jefatura: toStr(r.jefatura).trim(),
+      servicio: toStr(r.servicio),
+      tipoServicio: toStr(r.tipo_servicio),
+      valorDeclarado: toNum(r.valor_declarado),
+      precioTotal: toNum(r.precio_total),
+      ganancias: toNum(r.ganancias),
+      zona: toStr(r.zona),
+      email: toStr(r.email),
+      descripcion: toStr(r.descripcion),
+      diasAnticipadosCreacion: toNum(r.dias_anticipados_creacion),
+      fechaHoraAsignado: toStr(r.fecha_hora_asignado),
+      tipoAsignador: toStr(r.tipo_asignador),
+      horaAsignacion: toStr(r.hora_asignacion),
+      minutosAsignacion: toNum(r.minutos_asignacion),
     }))
     .filter((r) => r.id);
 
@@ -183,16 +160,10 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
 }
 
 // Se refresca sola cada 90s: cualquiera que abra el panel ve datos frescos
-// sin necesidad de un botón de "actualizar", y sin golpear la API de
-// Sheets en cada carga de página. No se usa unstable_cache (Next Data
-// Cache) porque el dataset completo ya pasa los 2MB que ese cache permite
-// por entrada — un caché simple en memoria del proceso no tiene ese límite.
+// sin necesidad de un botón de "actualizar", y sin golpear la base en cada
+// carga de página.
 let cached: { data: SheetsSnapshot; expiresAt: number } | null = null;
-// La automatización sincroniza cada 30 min — no hay razón para releer el
-// Sheet completo (28k+ filas, columnas A:DY) más seguido que esto. Subido
-// de 90s: cada cambio de pestaña que no reutiliza la instancia serverless
-// de Vercel paga esta misma lectura pesada otra vez.
-const CACHE_TTL_MS = 180_000;
+const CACHE_TTL_MS = 90_000;
 
 export async function getSheetsSnapshot(): Promise<SheetsSnapshot> {
   if (cached && cached.expiresAt > Date.now()) return cached.data;

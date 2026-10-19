@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { fetchServicesFromDb } from './bi-db';
+import { syncIdsToSupabase } from './supabase-sync';
 
 // Mismo upsert que automation/lib/sheets.mjs (upsertServiceRows) — se
 // duplica acá porque el botón "Actualizar ahora" del panel corre en
@@ -83,6 +84,7 @@ export async function syncServicesFromDb({
   const newRows: string[][] = [];
   const updates: { rowNumber: number; values: string[] }[] = [];
   const historyRows: string[][] = [];
+  const affectedIds: string[] = [];
 
   for (let r = 1; r < csvRows.length; r += 1) {
     const row = csvRows[r];
@@ -94,9 +96,11 @@ export async function syncServicesFromDb({
     if (!found) {
       newRows.push(row);
       historyRows.push([now, id, '(nuevo)', newState, 'Panel (manual)', 'OK']);
+      affectedIds.push(String(id));
     } else if (stateColExisting >= 0 && found.estado !== String(newState)) {
       updates.push({ rowNumber: found.rowNumber, values: row });
       historyRows.push([now, id, found.estado, newState, 'Panel (manual)', 'OK']);
+      affectedIds.push(String(id));
     }
   }
 
@@ -147,6 +151,13 @@ export async function syncServicesFromDb({
     valueInputOption: 'RAW',
     requestBody: { values: [['Última sincronización real', now]] },
   });
+
+  // El panel ya lee de Supabase, no del Sheet — sin este paso, el botón
+  // "Actualizar ahora" escribiría en el Sheet pero no se vería ningún
+  // cambio en pantalla.
+  if (affectedIds.length) {
+    await syncIdsToSupabase(affectedIds);
+  }
 
   return { nuevos: newRows.length, actualizados: updates.length, total: csvRows.length - 1 };
 }
