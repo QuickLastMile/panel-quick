@@ -79,8 +79,8 @@ function emptyInput(): ColaboradorInput {
     telefonoEmergencia: '',
     fechaNacimiento: '',
     placa: '',
-    tipoVehiculo: 'Moto',
-    medioVinculacion: 'Referido',
+    tipoVehiculo: 'MOTO',
+    medioVinculacion: 'REFERIDO',
     agilizador: '',
   };
 }
@@ -122,7 +122,7 @@ function ColaboradorForm({ initial, id, onClose }: { initial: Partial<Colaborado
   const [error, setError] = useState('');
 
   const set = <K extends keyof ColaboradorInput>(k: K, v: ColaboradorInput[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const sinPlaca = ['A pie', 'Auxiliar', 'Bici'].includes(form.tipoVehiculo);
+  const sinPlaca = ['A PIE', 'AUXILIAR', 'BICI'].includes(form.tipoVehiculo.toUpperCase());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

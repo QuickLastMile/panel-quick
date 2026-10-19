@@ -186,7 +186,7 @@ export async function getColaboradorHistorial(id: number): Promise<ColaboradorHi
 }
 
 function normalizePlaca(placa: string, tipoVehiculo: string): string {
-  const noPlaca = ['A pie', 'Auxiliar', 'Bici'].includes(tipoVehiculo);
+  const noPlaca = ['A PIE', 'AUXILIAR', 'BICI'].includes(tipoVehiculo.toUpperCase());
   if (noPlaca) return 'N/A';
   return placa.trim().toUpperCase() || 'N/A';
 }

@@ -17,8 +17,8 @@ export default function RegistroColaboradorPublicoPage() {
             <span>G</span>
             <MapPin size={26} strokeWidth={2.5} className="text-[var(--accent-bright)]" fill="var(--accent-soft)" />
           </div>
-          <p className="text-sm text-[var(--text-muted)]">Registro de colaborador</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Completa tus datos para vincularte con Quick.</p>
+          <p className="text-sm text-[var(--text-muted)]">Registro rápido de vinculación</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Para agilizadores en campo — registra aquí al colaborador que acabas de vincular, sin necesidad de entrar al panel.</p>
         </div>
         <RegistroPublicoForm />
       </div>

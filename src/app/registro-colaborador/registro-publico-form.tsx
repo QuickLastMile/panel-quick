@@ -21,8 +21,8 @@ function empty(): ColaboradorInput {
     telefonoEmergencia: '',
     fechaNacimiento: '',
     placa: '',
-    tipoVehiculo: 'Moto',
-    medioVinculacion: 'Referido',
+    tipoVehiculo: 'MOTO',
+    medioVinculacion: 'REFERIDO',
     agilizador: '',
   };
 }
@@ -34,13 +34,14 @@ export default function RegistroPublicoForm() {
   const [done, setDone] = useState(false);
 
   const set = <K extends keyof ColaboradorInput>(k: K, v: ColaboradorInput[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const sinPlaca = ['A pie', 'Auxiliar', 'Bici'].includes(form.tipoVehiculo);
+  const sinPlaca = ['A PIE', 'AUXILIAR', 'BICI'].includes(form.tipoVehiculo.toUpperCase());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.nombreCompleto.trim()) return setError('Escribe tu nombre completo.');
-    if (!form.identificacion.trim()) return setError('Escribe tu número de identificación.');
-    if (!form.telefono.trim()) return setError('Escribe tu número de teléfono.');
+    if (!form.agilizador.trim()) return setError('Escribe tu nombre (el agilizador que está registrando).');
+    if (!form.nombreCompleto.trim()) return setError('Escribe el nombre completo del colaborador.');
+    if (!form.identificacion.trim()) return setError('Escribe la identificación del colaborador.');
+    if (!form.telefono.trim()) return setError('Escribe el teléfono del colaborador.');
     setSaving(true);
     setError('');
     const res = await registrarColaboradorPublico(form);
@@ -53,19 +54,29 @@ export default function RegistroPublicoForm() {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <CheckCircle2 size={40} className="text-emerald-400" />
-        <p className="text-lg font-bold text-[var(--text)]">¡Registro recibido!</p>
+        <p className="text-lg font-bold text-[var(--text)]">¡Colaborador registrado!</p>
         <p className="text-sm text-[var(--text-secondary)]">
-          Gracias, {form.nombreCompleto.split(' ')[0]}. Tu información quedó registrada — el equipo de Quick se pondrá en
-          contacto contigo.
+          {form.nombreCompleto} quedó registrado correctamente. Ya aparece en el panel de Vinculación.
         </p>
+        <button
+          onClick={() => setDone(false)}
+          className="mt-2 rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+        >
+          Registrar otro colaborador
+        </button>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent-soft)] p-3">
+        <label className={labelCls}>Tu nombre (agilizador) *</label>
+        <input value={form.agilizador} onChange={(e) => set('agilizador', e.target.value.toUpperCase())} className={inputCls} placeholder="Quién está registrando" />
+      </div>
+
       <div>
-        <label className={labelCls}>Nombre completo *</label>
+        <label className={labelCls}>Nombre completo del colaborador *</label>
         <input value={form.nombreCompleto} onChange={(e) => set('nombreCompleto', e.target.value.toUpperCase())} className={inputCls} placeholder="Nombre y apellidos" />
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -89,7 +100,7 @@ export default function RegistroPublicoForm() {
         </div>
         <div>
           <label className={labelCls}>Ciudad</label>
-          <input value={form.ciudad} onChange={(e) => set('ciudad', e.target.value.toUpperCase())} className={inputCls} list="ciudades" placeholder="Tu ciudad" autoComplete="off" />
+          <input value={form.ciudad} onChange={(e) => set('ciudad', e.target.value.toUpperCase())} className={inputCls} list="ciudades" placeholder="Ciudad del colaborador" autoComplete="off" />
           <datalist id="ciudades">
             {CIUDADES_COLOMBIA.map((c) => (
               <option key={c} value={c} />
@@ -122,16 +133,12 @@ export default function RegistroPublicoForm() {
         </div>
       </div>
       <div>
-        <label className={labelCls}>¿Cómo te enteraste de Quick?</label>
+        <label className={labelCls}>Medio de vinculación</label>
         <select value={form.medioVinculacion} onChange={(e) => set('medioVinculacion', e.target.value)} className={inputCls}>
           {MEDIOS_VINCULACION.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-      </div>
-      <div>
-        <label className={labelCls}>¿Quién te contactó? (agilizador, si lo conoces)</label>
-        <input value={form.agilizador} onChange={(e) => set('agilizador', e.target.value.toUpperCase())} className={inputCls} placeholder="Opcional" />
       </div>
 
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
@@ -141,7 +148,7 @@ export default function RegistroPublicoForm() {
         disabled={saving}
         className="mt-2 rounded-lg bg-gradient-gold px-4 py-2.5 text-sm font-bold text-[#141008] transition-all duration-150 hover:brightness-110 hover:shadow-[0_0_18px_rgba(214,164,25,0.3)] active:scale-[0.98] disabled:opacity-60"
       >
-        {saving ? 'Enviando…' : 'Registrarme'}
+        {saving ? 'Guardando…' : 'Registrar colaborador'}
       </button>
     </form>
   );

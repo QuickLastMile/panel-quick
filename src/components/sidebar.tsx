@@ -38,6 +38,14 @@ export default function Sidebar({ role, nombre, email }: { role: Role; nombre: s
 
   const items = NAV.filter((item) => (item.roles as readonly string[]).includes(role));
 
+  // Varias rutas comparten prefijo (ej. "/dashboard/onboarding" y
+  // "/dashboard/onboarding/registro") — sin esto, las dos se resaltaban en
+  // amarillo a la vez. Solo se resalta la coincidencia más específica.
+  const activeHref = items
+    .map((i) => i.href)
+    .filter((href) => pathname === href || pathname.startsWith(href + '/'))
+    .sort((a, b) => b.length - a.length)[0];
+
   return (
     <aside
       className={`sticky top-0 flex h-screen flex-none flex-col border-r border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--text)] transition-[width] duration-200 ${
@@ -61,7 +69,7 @@ export default function Sidebar({ role, nombre, email }: { role: Role; nombre: s
 
       <nav className="flex-1 space-y-1 px-3">
         {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
+          const active = item.href === activeHref;
           const Icon = item.icon;
           return (
             <Link
