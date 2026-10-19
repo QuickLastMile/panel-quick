@@ -316,6 +316,7 @@ export default function BaseClient({
                   Todos los correos que han pedido servicios ya están especificados. 🎉
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -343,6 +344,7 @@ export default function BaseClient({
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
               <p className="border-t border-[var(--border)] px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
                 Mientras no se especifiquen, estos servicios se cuentan como "OTRO" / jefatura "nn" para no bloquear nada.
@@ -366,6 +368,7 @@ export default function BaseClient({
               </div>
 
               <div className="panel-card overflow-hidden rounded-xl">
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -398,6 +401,7 @@ export default function BaseClient({
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
@@ -422,6 +426,7 @@ export default function BaseClient({
                   Todos los que han asignado servicios ya están especificados. 🎉
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -449,6 +454,7 @@ export default function BaseClient({
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
               <p className="border-t border-[var(--border)] px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
                 Mientras no se especifiquen, estos servicios se cuentan como GESTOR "OTRO" para no bloquear nada.
@@ -472,6 +478,7 @@ export default function BaseClient({
               </div>
 
               <div className="panel-card overflow-hidden rounded-xl">
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -505,6 +512,7 @@ export default function BaseClient({
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}

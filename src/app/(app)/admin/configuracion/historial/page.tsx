@@ -71,6 +71,7 @@ export default async function HistorialPage() {
           </div>
 
           <div className="panel-card overflow-hidden rounded-xl">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr>
@@ -133,6 +134,7 @@ export default async function HistorialPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

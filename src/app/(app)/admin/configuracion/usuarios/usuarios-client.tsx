@@ -288,6 +288,7 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
       </div>
 
       <div className="panel-card overflow-hidden rounded-xl">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
@@ -343,17 +344,20 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
                     <div className="flex items-center justify-end gap-3">
                       <button
                         onClick={() => setPasswordModalUser(u)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)]"
+                        title="Cambiar contraseña"
+                        aria-label="Cambiar contraseña"
+                        className="text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)]"
                       >
-                        <KeyRound size={13} /> Cambiar contraseña
+                        <KeyRound size={15} />
                       </button>
                       <button
                         onClick={() => handleToggle(u)}
                         disabled={togglingEmail === u.email}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)] disabled:opacity-50"
+                        title={u.activo ? 'Desactivar' : 'Activar'}
+                        aria-label={u.activo ? 'Desactivar' : 'Activar'}
+                        className="text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)] disabled:opacity-50"
                       >
-                        {u.activo ? <ShieldOff size={13} /> : <ShieldCheck size={13} />}
-                        {u.activo ? 'Desactivar' : 'Activar'}
+                        {u.activo ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}
                       </button>
                     </div>
                   </td>
@@ -362,6 +366,7 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <NewUserModal open={modalOpen} onClose={() => setModalOpen(false)} />
