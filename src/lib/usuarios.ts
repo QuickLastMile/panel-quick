@@ -6,7 +6,7 @@ import type { Usuario } from './usuarios-types';
 export type { Usuario } from './usuarios-types';
 
 const SHEET_NAME = 'Usuarios';
-const VALID_ROLES = new Set<Role>(['admin', 'supervisor', 'coordinador']);
+const VALID_ROLES = new Set<Role>(['admin', 'supervisor', 'coordinador', 'onboarding']);
 
 type UsuarioRow = Usuario & { passwordHash: string };
 

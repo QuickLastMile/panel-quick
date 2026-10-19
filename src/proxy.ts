@@ -12,7 +12,7 @@ export async function proxy(request: NextRequest) {
   const role = session?.role ?? null;
 
   if (pathname === '/login') {
-    if (role) return NextResponse.redirect(new URL('/dashboard', request.url));
+    if (role) return NextResponse.redirect(new URL(ROLE_ALLOWED_PATHS[role][0] || '/dashboard', request.url));
     return NextResponse.next();
   }
 
@@ -25,7 +25,10 @@ export async function proxy(request: NextRequest) {
   const allowed = ROLE_ALLOWED_PATHS[role];
   const canAccess = allowed.includes(pathname);
   if (!canAccess) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Algunos roles (ej. "onboarding") no tienen "/dashboard" en su lista —
+    // mandarlos siempre ahí crearía un redirect loop. Se manda a la primera
+    // ruta permitida de su rol.
+    return NextResponse.redirect(new URL(allowed[0] || '/dashboard', request.url));
   }
 
   return NextResponse.next();

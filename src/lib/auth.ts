@@ -1,11 +1,12 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-export type Role = 'admin' | 'supervisor' | 'coordinador';
+export type Role = 'admin' | 'supervisor' | 'coordinador' | 'onboarding';
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administrador',
   supervisor: 'Supervisor',
   coordinador: 'Coordinador / General',
+  onboarding: 'Agilizador (Onboarding)',
 };
 
 // Qué rutas puede ver cada rol — coincidencia EXACTA (no por prefijo).
@@ -19,6 +20,7 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/mensajeros',
     '/dashboard/directorio',
     '/dashboard/onboarding',
+    '/dashboard/onboarding/registro',
     '/admin/configuracion',
     '/admin/configuracion/base',
     '/admin/configuracion/historial',
@@ -31,8 +33,12 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/mensajeros',
     '/dashboard/directorio',
     '/dashboard/onboarding',
+    '/dashboard/onboarding/registro',
   ],
   coordinador: ['/dashboard'],
+  // Rol restringido: solo su área de trabajo (registrar/editar
+  // colaboradores) — no ve el resto del panel ni Configuración.
+  onboarding: ['/dashboard/onboarding/registro'],
 };
 
 const COOKIE_NAME = 'quick_session';
