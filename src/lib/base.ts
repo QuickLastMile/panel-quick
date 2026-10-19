@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { logModificacion } from './modificaciones';
 
 // La hoja BASE es la tabla de referencia que alimenta, por VLOOKUP, las
 // columnas PROYECTO/JEFATURA/GESTOR/CARGO GESTOR/TIPO ASIGNADOR de
@@ -84,13 +85,16 @@ export async function getColaboradorBaseRows(): Promise<ColaboradorBaseRow[]> {
     .filter((r) => r.colaboradorData);
 }
 
-export async function saveProyectoBaseRow(row: {
-  rowNumber?: number;
-  email: string;
-  nombre: string;
-  proceso: string;
-  jefatura: string;
-}): Promise<void> {
+export async function saveProyectoBaseRow(
+  row: {
+    rowNumber?: number;
+    email: string;
+    nombre: string;
+    proceso: string;
+    jefatura: string;
+  },
+  usuario: string
+): Promise<void> {
   const email = row.email.trim();
   if (!email) throw new Error('El email es obligatorio.');
   const spreadsheetId = getSpreadsheetId();
@@ -98,12 +102,24 @@ export async function saveProyectoBaseRow(row: {
   const values = [[email, row.nombre.trim(), row.proceso.trim(), row.jefatura.trim()]];
 
   if (row.rowNumber) {
+    const existing = await getProyectoBaseRows();
+    const before = existing.find((r) => r.rowNumber === row.rowNumber);
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${SHEET_NAME}!A${row.rowNumber}:D${row.rowNumber}`,
       valueInputOption: 'RAW',
       requestBody: { values },
     });
+    const campos: [string, string, string][] = [
+      ['Nombre', before?.nombre || '', row.nombre.trim()],
+      ['Proyecto', before?.proceso || '', row.proceso.trim()],
+      ['Jefatura', before?.jefatura || '', row.jefatura.trim()],
+    ];
+    for (const [campo, antes, despues] of campos) {
+      if (antes !== despues) {
+        await logModificacion({ area: 'BASE (Proyecto/Jefatura)', entidad: email, usuario, campo, valorAnterior: antes, valorNuevo: despues });
+      }
+    }
     return;
   }
 
@@ -117,16 +133,20 @@ export async function saveProyectoBaseRow(row: {
     valueInputOption: 'RAW',
     requestBody: { values },
   });
+  await logModificacion({ area: 'BASE (Proyecto/Jefatura)', entidad: email, usuario, campo: 'creación', valorNuevo: `${row.nombre.trim()} · ${row.proceso.trim()} · ${row.jefatura.trim()}` });
 }
 
-export async function saveColaboradorBaseRow(row: {
-  rowNumber?: number;
-  colaboradorData: string;
-  cargo: string;
-  ext: string;
-  colaborador: string;
-  tipo: string;
-}): Promise<void> {
+export async function saveColaboradorBaseRow(
+  row: {
+    rowNumber?: number;
+    colaboradorData: string;
+    cargo: string;
+    ext: string;
+    colaborador: string;
+    tipo: string;
+  },
+  usuario: string
+): Promise<void> {
   const colaboradorData = row.colaboradorData.trim();
   if (!colaboradorData) throw new Error('El dato de colaborador ("ID-Nombre") es obligatorio.');
   const cargo = row.cargo.trim();
@@ -144,12 +164,25 @@ export async function saveColaboradorBaseRow(row: {
   const values = [[colaboradorData, cargo, ext, colaborador, conca, mayus, tipo]];
 
   if (row.rowNumber) {
+    const existing = await getColaboradorBaseRows();
+    const before = existing.find((r) => r.rowNumber === row.rowNumber);
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${SHEET_NAME}!F${row.rowNumber}:L${row.rowNumber}`,
       valueInputOption: 'RAW',
       requestBody: { values },
     });
+    const campos: [string, string, string][] = [
+      ['Cargo', before?.cargo || '', cargo],
+      ['Extensión', before?.ext || '', ext],
+      ['Nombre del colaborador', before?.colaborador || '', colaborador],
+      ['Tipo', before?.tipo || '', tipo],
+    ];
+    for (const [campo, antes, despues] of campos) {
+      if (antes !== despues) {
+        await logModificacion({ area: 'BASE (Gestor/Cargo)', entidad: colaboradorData, usuario, campo, valorAnterior: antes, valorNuevo: despues });
+      }
+    }
     return;
   }
 
@@ -161,4 +194,5 @@ export async function saveColaboradorBaseRow(row: {
     valueInputOption: 'RAW',
     requestBody: { values },
   });
+  await logModificacion({ area: 'BASE (Gestor/Cargo)', entidad: colaboradorData, usuario, campo: 'creación', valorNuevo: `${colaborador} · ${cargo} · ${tipo}` });
 }

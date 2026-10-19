@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import type { Role } from './auth';
 import { hashPassword, verifyPassword } from './password';
 import type { Usuario } from './usuarios-types';
+import { logModificacion } from './modificaciones';
 
 export type { Usuario } from './usuarios-types';
 
@@ -66,17 +67,20 @@ export async function checkCredentials(email: string, password: string): Promise
   return { role: user.rol, nombre: user.nombre };
 }
 
-export async function createUsuario({
-  email,
-  nombre,
-  password,
-  rol,
-}: {
-  email: string;
-  nombre: string;
-  password: string;
-  rol: Role;
-}): Promise<void> {
+export async function createUsuario(
+  {
+    email,
+    nombre,
+    password,
+    rol,
+  }: {
+    email: string;
+    nombre: string;
+    password: string;
+    rol: Role;
+  },
+  usuarioActor: string
+): Promise<void> {
   const normalized = normalizeEmail(email);
   if (!normalized.includes('@')) throw new Error('Correo inválido.');
   if (!nombre.trim()) throw new Error('El nombre es obligatorio.');
@@ -99,9 +103,10 @@ export async function createUsuario({
       values: [[normalized, nombre.trim(), hashPassword(password), rol, 'TRUE', new Date().toISOString()]],
     },
   });
+  await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'creación', valorNuevo: `${nombre.trim()} · ${rol}` });
 }
 
-export async function setUsuarioActivo(email: string, activo: boolean): Promise<void> {
+export async function setUsuarioActivo(email: string, activo: boolean, usuarioActor: string): Promise<void> {
   const normalized = normalizeEmail(email);
   const spreadsheetId = getSpreadsheetId();
   const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
@@ -117,14 +122,24 @@ export async function setUsuarioActivo(email: string, activo: boolean): Promise<
     valueInputOption: 'RAW',
     requestBody: { values: [[activo ? 'TRUE' : 'FALSE']] },
   });
+  await logModificacion({
+    area: 'Usuarios',
+    entidad: normalized,
+    usuario: usuarioActor,
+    campo: 'Estado',
+    valorAnterior: activo ? 'Desactivado' : 'Activo',
+    valorNuevo: activo ? 'Activo' : 'Desactivado',
+  });
 }
 
-export async function setUsuarioRol(email: string, rol: Role): Promise<void> {
+export async function setUsuarioRol(email: string, rol: Role, usuarioActor: string): Promise<void> {
   if (!VALID_ROLES.has(rol)) throw new Error('Rol inválido.');
   const normalized = normalizeEmail(email);
   const spreadsheetId = getSpreadsheetId();
   const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
 
+  const existing = await getAllUsuarios();
+  const before = existing.find((u) => u.email === normalized);
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_NAME}!A:A` });
   const col = (res.data.values || []).map((r) => normalizeEmail(String(r[0] ?? '')));
   const idx = col.indexOf(normalized);
@@ -136,9 +151,10 @@ export async function setUsuarioRol(email: string, rol: Role): Promise<void> {
     valueInputOption: 'RAW',
     requestBody: { values: [[rol]] },
   });
+  await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'Rol', valorAnterior: before?.rol || '', valorNuevo: rol });
 }
 
-export async function setUsuarioPassword(email: string, newPassword: string): Promise<void> {
+export async function setUsuarioPassword(email: string, newPassword: string, usuarioActor: string): Promise<void> {
   if (newPassword.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
   const normalized = normalizeEmail(email);
   const spreadsheetId = getSpreadsheetId();
@@ -155,4 +171,6 @@ export async function setUsuarioPassword(email: string, newPassword: string): Pr
     valueInputOption: 'RAW',
     requestBody: { values: [[hashPassword(newPassword)]] },
   });
+  // Nunca se guarda la contraseña en el historial, solo que se cambió.
+  await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'Contraseña', valorNuevo: 'Se cambió la contraseña' });
 }
