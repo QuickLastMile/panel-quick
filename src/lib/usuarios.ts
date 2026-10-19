@@ -118,3 +118,22 @@ export async function setUsuarioActivo(email: string, activo: boolean): Promise<
     requestBody: { values: [[activo ? 'TRUE' : 'FALSE']] },
   });
 }
+
+export async function setUsuarioPassword(email: string, newPassword: string): Promise<void> {
+  if (newPassword.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  const normalized = normalizeEmail(email);
+  const spreadsheetId = getSpreadsheetId();
+  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
+
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_NAME}!A:A` });
+  const col = (res.data.values || []).map((r) => normalizeEmail(String(r[0] ?? '')));
+  const idx = col.indexOf(normalized);
+  if (idx === -1) throw new Error('Usuario no encontrado.');
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${SHEET_NAME}!C${idx + 1}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[hashPassword(newPassword)]] },
+  });
+}

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { Plus, X, AlertTriangle } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import type { ProyectoBaseRow, ColaboradorBaseRow } from '@/lib/base';
 import { saveProyecto, saveColaborador } from './actions';
 
@@ -43,7 +43,50 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function ProyectoForm({ initial, onClose }: { initial: Partial<ProyectoBaseRow>; onClose: () => void }) {
+// Input con lista desplegable de valores ya usados, pero que deja escribir
+// uno nuevo libremente — evita typos/duplicados (ej. "Giovanny-John" vs
+// "GIOVANNY - JOHN") sin bloquear nada que todavía no esté en la lista.
+function ComboInput({
+  id,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+}) {
+  return (
+    <>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputCls}
+        placeholder={placeholder}
+        list={id}
+        autoComplete="off"
+      />
+      <datalist id={id}>
+        {options.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
+function ProyectoForm({
+  initial,
+  onClose,
+  jefaturasExistentes,
+}: {
+  initial: Partial<ProyectoBaseRow>;
+  onClose: () => void;
+  jefaturasExistentes: string[];
+}) {
   const router = useRouter();
   const [email, setEmail] = useState(initial.email || '');
   const [nombre, setNombre] = useState(initial.nombre || '');
@@ -86,7 +129,13 @@ function ProyectoForm({ initial, onClose }: { initial: Partial<ProyectoBaseRow>;
       </div>
       <div>
         <label className={labelCls}>Jefatura</label>
-        <input value={jefatura} onChange={(e) => setJefatura(e.target.value)} className={inputCls} placeholder="Ej. GIOVANNY - JOHN" />
+        <ComboInput
+          id="jefaturas-list"
+          value={jefatura}
+          onChange={setJefatura}
+          options={jefaturasExistentes}
+          placeholder="Elige una existente o escribe una nueva"
+        />
       </div>
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
       <div className="flex items-center justify-end gap-2 pt-1">
@@ -101,7 +150,17 @@ function ProyectoForm({ initial, onClose }: { initial: Partial<ProyectoBaseRow>;
   );
 }
 
-function ColaboradorForm({ initial, onClose }: { initial: Partial<ColaboradorBaseRow>; onClose: () => void }) {
+function ColaboradorForm({
+  initial,
+  onClose,
+  gestoresExistentes,
+  tiposExistentes,
+}: {
+  initial: Partial<ColaboradorBaseRow>;
+  onClose: () => void;
+  gestoresExistentes: string[];
+  tiposExistentes: string[];
+}) {
   const router = useRouter();
   const [colaboradorData, setColaboradorData] = useState(initial.colaboradorData || '');
   const [cargo, setCargo] = useState(initial.cargo || '');
@@ -141,7 +200,7 @@ function ColaboradorForm({ initial, onClose }: { initial: Partial<ColaboradorBas
           disabled={!!initial.rowNumber}
         />
         <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-          Tal cual aparece en "Usuario Asignación" — cópialo de la lista de "Sin clasificar" para no equivocarte.
+          Tal cual aparece en "Usuario Asignación" — cópialo de la lista de "No especificados" para no equivocarte.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -155,15 +214,24 @@ function ColaboradorForm({ initial, onClose }: { initial: Partial<ColaboradorBas
         </div>
       </div>
       <div>
-        <label className={labelCls}>Nombre del colaborador</label>
-        <input value={colaborador} onChange={(e) => setColaborador(e.target.value)} className={inputCls} placeholder="Nombre completo" />
+        <label className={labelCls}>Nombre del colaborador (Gestor)</label>
+        <ComboInput
+          id="gestores-list"
+          value={colaborador}
+          onChange={setColaborador}
+          options={gestoresExistentes}
+          placeholder="Elige uno existente o escribe uno nuevo"
+        />
       </div>
       <div>
         <label className={labelCls}>Tipo</label>
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
-          <option value="AGILIZADOR">AGILIZADOR</option>
-          <option value="OTRO">OTRO</option>
-        </select>
+        <ComboInput
+          id="tipos-list"
+          value={tipo}
+          onChange={setTipo}
+          options={Array.from(new Set(['AGILIZADOR', 'OTRO', ...tiposExistentes]))}
+          placeholder="Elige uno existente o escribe uno nuevo"
+        />
       </div>
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
       <div className="flex items-center justify-end gap-2 pt-1">
@@ -178,18 +246,31 @@ function ColaboradorForm({ initial, onClose }: { initial: Partial<ColaboradorBas
   );
 }
 
+const subTabBtnCls = (active: boolean) =>
+  `rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+    active ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
+  }`;
+
 export default function BaseClient({
   proyectoRows,
   colaboradorRows,
   emailsSinClasificar,
   colaboradoresSinClasificar,
+  jefaturasExistentes,
+  gestoresExistentes,
+  tiposExistentes,
 }: {
   proyectoRows: ProyectoBaseRow[];
   colaboradorRows: ColaboradorBaseRow[];
   emailsSinClasificar: { email: string; count: number }[];
   colaboradoresSinClasificar: { colaboradorData: string; count: number }[];
+  jefaturasExistentes: string[];
+  gestoresExistentes: string[];
+  tiposExistentes: string[];
 }) {
   const [tab, setTab] = useState<'proyecto' | 'colaborador'>('proyecto');
+  const [proyectoSubTab, setProyectoSubTab] = useState<'especificado' | 'no-especificado'>('especificado');
+  const [colaboradorSubTab, setColaboradorSubTab] = useState<'especificado' | 'no-especificado'>('especificado');
   const [search, setSearch] = useState('');
   const [proyectoModal, setProyectoModal] = useState<Partial<ProyectoBaseRow> | null>(null);
   const [colaboradorModal, setColaboradorModal] = useState<Partial<ColaboradorBaseRow> | null>(null);
@@ -209,181 +290,240 @@ export default function BaseClient({
   return (
     <div>
       <div className="mb-5 flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)] p-1 w-fit">
-        <button
-          onClick={() => setTab('proyecto')}
-          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
-            tab === 'proyecto' ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
-          }`}
-        >
+        <button onClick={() => setTab('proyecto')} className={subTabBtnCls(tab === 'proyecto')}>
           Proyecto / Jefatura (por Email)
         </button>
-        <button
-          onClick={() => setTab('colaborador')}
-          className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
-            tab === 'colaborador' ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
-          }`}
-        >
+        <button onClick={() => setTab('colaborador')} className={subTabBtnCls(tab === 'colaborador')}>
           Gestor / Cargo (por Usuario Asignación)
         </button>
       </div>
 
       {tab === 'proyecto' && (
         <>
-          {emailsSinClasificar.length > 0 && (
-            <div className="mb-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4">
-              <p className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                <AlertTriangle size={14} /> {emailsSinClasificar.length} correo{emailsSinClasificar.length === 1 ? '' : 's'} sin clasificar
-                (cayeron en "nn")
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {emailsSinClasificar.map((e) => (
-                  <button
-                    key={e.email}
-                    onClick={() => setProyectoModal({ email: e.email })}
-                    className="rounded-full border border-amber-700/40 bg-amber-950/30 px-2.5 py-1 text-[11px] font-semibold text-amber-300 transition-colors hover:border-amber-500"
-                  >
-                    {e.email} ({e.count})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-3 flex items-center justify-between gap-2.5">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por email, proyecto, jefatura…"
-              className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
-            />
-            <button
-              onClick={() => setProyectoModal({})}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
-            >
-              <Plus size={14} /> Nuevo
+          <div className="mb-4 flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)]/60 p-1 w-fit">
+            <button onClick={() => setProyectoSubTab('especificado')} className={subTabBtnCls(proyectoSubTab === 'especificado')}>
+              Especificados ({proyectoRows.length})
+            </button>
+            <button onClick={() => setProyectoSubTab('no-especificado')} className={subTabBtnCls(proyectoSubTab === 'no-especificado')}>
+              No especificados ({emailsSinClasificar.length})
             </button>
           </div>
 
-          <div className="panel-card overflow-hidden rounded-xl">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  {['Email', 'Nombre', 'Proyecto', 'Jefatura', ''].map((h) => (
-                    <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProyectos.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
-                  </tr>
-                ) : (
-                  filteredProyectos.map((r) => (
-                    <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
-                      <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.email}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.nombre}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.proceso}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.jefatura}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-right">
-                        <button onClick={() => setProyectoModal(r)} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
-                          Editar
-                        </button>
-                      </td>
+          {proyectoSubTab === 'no-especificado' ? (
+            <div className="panel-card overflow-hidden rounded-xl">
+              {emailsSinClasificar.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+                  Todos los correos que han pedido servicios ya están especificados. 🎉
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {['Email', 'Servicios con este correo', ''].map((h) => (
+                        <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {emailsSinClasificar.map((e) => (
+                      <tr key={e.email} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                        <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{e.email}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{e.count}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                          <button
+                            onClick={() => setProyectoModal({ email: e.email })}
+                            className="text-xs font-semibold text-[var(--accent-bright)] hover:underline"
+                          >
+                            Especificar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="border-t border-[var(--border)] px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
+                Mientras no se especifiquen, estos servicios se cuentan como "OTRO" / jefatura "nn" para no bloquear nada.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-2.5">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por email, proyecto, jefatura…"
+                  className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={() => setProyectoModal({})}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Plus size={14} /> Nuevo
+                </button>
+              </div>
+
+              <div className="panel-card overflow-hidden rounded-xl">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {['Email', 'Nombre', 'Proyecto', 'Jefatura', ''].map((h) => (
+                        <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProyectos.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
+                      </tr>
+                    ) : (
+                      filteredProyectos.map((r) => (
+                        <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                          <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.email}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.nombre}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.proceso}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.jefatura}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                            <button onClick={() => setProyectoModal(r)} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
 
       {tab === 'colaborador' && (
         <>
-          {colaboradoresSinClasificar.length > 0 && (
-            <div className="mb-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4">
-              <p className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-amber-400">
-                <AlertTriangle size={14} /> {colaboradoresSinClasificar.length} colaborador{colaboradoresSinClasificar.length === 1 ? '' : 'es'} sin
-                clasificar (cayeron en "OTRO")
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {colaboradoresSinClasificar.map((c) => (
-                  <button
-                    key={c.colaboradorData}
-                    onClick={() => setColaboradorModal({ colaboradorData: c.colaboradorData })}
-                    className="rounded-full border border-amber-700/40 bg-amber-950/30 px-2.5 py-1 text-[11px] font-semibold text-amber-300 transition-colors hover:border-amber-500"
-                  >
-                    {c.colaboradorData} ({c.count})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-3 flex items-center justify-between gap-2.5">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por colaborador, cargo, tipo…"
-              className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
-            />
-            <button
-              onClick={() => setColaboradorModal({})}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
-            >
-              <Plus size={14} /> Nuevo
+          <div className="mb-4 flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)]/60 p-1 w-fit">
+            <button onClick={() => setColaboradorSubTab('especificado')} className={subTabBtnCls(colaboradorSubTab === 'especificado')}>
+              Especificados ({colaboradorRows.length})
+            </button>
+            <button onClick={() => setColaboradorSubTab('no-especificado')} className={subTabBtnCls(colaboradorSubTab === 'no-especificado')}>
+              No especificados ({colaboradoresSinClasificar.length})
             </button>
           </div>
 
-          <div className="panel-card overflow-hidden rounded-xl">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  {['Colaborador (ID-Nombre)', 'Cargo', 'Ext.', 'Nombre', 'Tipo', ''].map((h) => (
-                    <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredColaboradores.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
-                  </tr>
-                ) : (
-                  filteredColaboradores.map((r) => (
-                    <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
-                      <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.colaboradorData}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.cargo}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.ext}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.colaborador}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.tipo}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-right">
-                        <button onClick={() => setColaboradorModal(r)} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
-                          Editar
-                        </button>
-                      </td>
+          {colaboradorSubTab === 'no-especificado' ? (
+            <div className="panel-card overflow-hidden rounded-xl">
+              {colaboradoresSinClasificar.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+                  Todos los que han asignado servicios ya están especificados. 🎉
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {['Colaborador (ID-Nombre)', 'Servicios asignados', ''].map((h) => (
+                        <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {colaboradoresSinClasificar.map((c) => (
+                      <tr key={c.colaboradorData} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                        <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{c.colaboradorData}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{c.count}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                          <button
+                            onClick={() => setColaboradorModal({ colaboradorData: c.colaboradorData })}
+                            className="text-xs font-semibold text-[var(--accent-bright)] hover:underline"
+                          >
+                            Especificar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="border-t border-[var(--border)] px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
+                Mientras no se especifiquen, estos servicios se cuentan como GESTOR "OTRO" para no bloquear nada.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-2.5">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por colaborador, cargo, tipo…"
+                  className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={() => setColaboradorModal({})}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Plus size={14} /> Nuevo
+                </button>
+              </div>
+
+              <div className="panel-card overflow-hidden rounded-xl">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      {['Colaborador (ID-Nombre)', 'Cargo', 'Ext.', 'Nombre', 'Tipo', ''].map((h) => (
+                        <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredColaboradores.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
+                      </tr>
+                    ) : (
+                      filteredColaboradores.map((r) => (
+                        <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                          <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.colaboradorData}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.cargo}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.ext}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.colaborador}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.tipo}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                            <button onClick={() => setColaboradorModal(r)} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
 
       {proyectoModal && (
         <Modal title={proyectoModal.rowNumber ? 'Editar proyecto' : 'Nuevo proyecto'} onClose={() => setProyectoModal(null)}>
-          <ProyectoForm initial={proyectoModal} onClose={() => setProyectoModal(null)} />
+          <ProyectoForm initial={proyectoModal} onClose={() => setProyectoModal(null)} jefaturasExistentes={jefaturasExistentes} />
         </Modal>
       )}
       {colaboradorModal && (
         <Modal title={colaboradorModal.rowNumber ? 'Editar colaborador' : 'Nuevo colaborador'} onClose={() => setColaboradorModal(null)}>
-          <ColaboradorForm initial={colaboradorModal} onClose={() => setColaboradorModal(null)} />
+          <ColaboradorForm
+            initial={colaboradorModal}
+            onClose={() => setColaboradorModal(null)}
+            gestoresExistentes={gestoresExistentes}
+            tiposExistentes={tiposExistentes}
+          />
         </Modal>
       )}
     </div>

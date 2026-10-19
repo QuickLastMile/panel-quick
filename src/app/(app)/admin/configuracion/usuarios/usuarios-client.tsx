@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Eye, EyeOff, X, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Plus, Eye, EyeOff, X, ShieldCheck, ShieldOff, KeyRound } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { Usuario } from '@/lib/usuarios-types';
 import { ROLE_LABEL, type Role } from '@/lib/auth';
-import { createUsuarioAction, toggleUsuarioActivoAction } from './actions';
+import { createUsuarioAction, toggleUsuarioActivoAction, setUsuarioPasswordAction } from './actions';
 
 const inputCls =
   'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]';
@@ -151,10 +151,111 @@ function NewUserModal({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
+function ChangePasswordModal({ usuario, onClose }: { usuario: Usuario; onClose: () => void }) {
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!mounted) return null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    const res = await setUsuarioPasswordAction(usuario.email, password);
+    setSaving(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    router.refresh();
+    onClose();
+  }
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40 animate-fade-in-up bg-black/75 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-md -translate-y-1/2 overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--border)] p-5">
+          <h2 className="text-sm font-bold text-[var(--text)]">Cambiar contraseña — {usuario.email}</h2>
+          <button
+            onClick={onClose}
+            type="button"
+            className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--accent-bright)]"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          <div>
+            <label className={labelCls}>Nueva contraseña *</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${inputCls} pr-10`}
+                placeholder="Mínimo 8 caracteres"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-[var(--text-muted)] transition-colors hover:text-[var(--accent-bright)]"
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+          {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              onClick={onClose}
+              type="button"
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)]"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-lg bg-gradient-gold px-4 py-2 text-sm font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+            >
+              {saving ? 'Guardando…' : 'Cambiar contraseña'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [togglingEmail, setTogglingEmail] = useState<string | null>(null);
+  const [passwordModalUser, setPasswordModalUser] = useState<Usuario | null>(null);
 
   async function handleToggle(u: Usuario) {
     setTogglingEmail(u.email);
@@ -217,14 +318,22 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
                     {u.creadoEn ? new Date(u.creadoEn).toLocaleDateString('es-CO') : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5 text-right">
-                    <button
-                      onClick={() => handleToggle(u)}
-                      disabled={togglingEmail === u.email}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)] disabled:opacity-50"
-                    >
-                      {u.activo ? <ShieldOff size={13} /> : <ShieldCheck size={13} />}
-                      {u.activo ? 'Desactivar' : 'Activar'}
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setPasswordModalUser(u)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)]"
+                      >
+                        <KeyRound size={13} /> Cambiar contraseña
+                      </button>
+                      <button
+                        onClick={() => handleToggle(u)}
+                        disabled={togglingEmail === u.email}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)] disabled:opacity-50"
+                      >
+                        {u.activo ? <ShieldOff size={13} /> : <ShieldCheck size={13} />}
+                        {u.activo ? 'Desactivar' : 'Activar'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -234,6 +343,7 @@ export default function UsuariosClient({ usuarios }: { usuarios: Usuario[] }) {
       </div>
 
       <NewUserModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      {passwordModalUser && <ChangePasswordModal usuario={passwordModalUser} onClose={() => setPasswordModalUser(null)} />}
     </div>
   );
 }

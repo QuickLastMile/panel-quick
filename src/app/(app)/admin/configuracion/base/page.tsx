@@ -37,6 +37,13 @@ export default async function BaseConfigPage() {
     .map(([colaboradorData, count]) => ({ colaboradorData, count }))
     .sort((a, b) => b.count - a.count);
 
+  // Valores ya usados — para que Jefatura/Gestor/Tipo se puedan elegir de
+  // una lista (evita typos y duplicados tipo "Giovanny-John" vs
+  // "GIOVANNY - JOHN") sin perder la posibilidad de escribir uno nuevo.
+  const jefaturasExistentes = Array.from(new Set(proyectoRows.map((r) => r.jefatura).filter(Boolean))).sort();
+  const gestoresExistentes = Array.from(new Set(colaboradorRows.map((r) => r.colaborador).filter(Boolean))).sort();
+  const tiposExistentes = Array.from(new Set(colaboradorRows.map((r) => r.tipo).filter(Boolean))).sort();
+
   return (
     <div>
       <PageHeader eyebrow="Configuración" title="Base de" accent="cruce (PROYECTO / GESTOR)" />
@@ -55,6 +62,9 @@ export default async function BaseConfigPage() {
         colaboradorRows={colaboradorRows}
         emailsSinClasificar={emailsSinClasificar}
         colaboradoresSinClasificar={colaboradoresSinClasificar}
+        jefaturasExistentes={jefaturasExistentes}
+        gestoresExistentes={gestoresExistentes}
+        tiposExistentes={tiposExistentes}
       />
     </div>
   );
