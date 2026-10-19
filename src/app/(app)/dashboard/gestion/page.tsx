@@ -11,7 +11,7 @@ export default async function GestionPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole(['admin', 'supervisor']);
+  await requireRole(['admin', 'supervisor', 'coordinador']);
   const filter = parseDateFilterParams(await searchParams);
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   // Excluye "OTRO"/"OTROS"/"NN" — son proyectos sin clasificar, no reales.

@@ -14,7 +14,7 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireRole(['admin', 'supervisor']);
+  await requireRole(['admin', 'supervisor', 'onboarding']);
   // Esta pestaña arranca en el día de AYER por defecto (no "hoy") — la data
   // de Onboarding se actualiza con un día de rezago, así que "hoy" suele
   // verse vacío.

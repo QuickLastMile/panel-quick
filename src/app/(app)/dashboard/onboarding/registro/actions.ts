@@ -13,7 +13,7 @@ import {
   type ColaboradorHistorialEntry,
 } from '@/lib/colaboradores';
 
-const ALLOWED_ROLES = ['admin', 'supervisor', 'onboarding'] as const;
+const ALLOWED_ROLES = ['admin', 'onboarding'] as const;
 
 async function currentUserEmail(): Promise<string> {
   const session = await getSession();
@@ -22,9 +22,14 @@ async function currentUserEmail(): Promise<string> {
 
 export async function createColaboradorAction(input: ColaboradorInput): Promise<{ error?: string }> {
   await requireRole([...ALLOWED_ROLES]);
-  const usuario = await currentUserEmail();
+  const session = await getSession();
+  const usuario = session?.email || 'desconocido';
+  // El agilizador de un registro manual siempre es quien lo está creando —
+  // no se toma lo que venga del formulario (ese campo ya no se muestra al
+  // crear).
+  const data = { ...input, agilizador: session?.nombre || usuario };
   try {
-    await createColaborador(input, usuario);
+    await createColaborador(data, usuario);
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No se pudo crear el colaborador.' };
   }

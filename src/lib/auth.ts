@@ -5,7 +5,7 @@ export type Role = 'admin' | 'supervisor' | 'coordinador' | 'onboarding';
 export const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administrador',
   supervisor: 'Supervisor',
-  coordinador: 'Coordinador / General',
+  coordinador: 'Coordinador / Gestor',
   onboarding: 'Agilizador (Onboarding)',
 };
 
@@ -26,6 +26,9 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/admin/configuracion/historial',
     '/admin/configuracion/usuarios',
   ],
+  // Ve todo el panel operativo, pero no Configuración ni Vinculación
+  // (registro de colaboradores) — esas dos quedan reservadas a admin y al
+  // rol "onboarding" respectivamente.
   supervisor: [
     '/dashboard',
     '/dashboard/gestion',
@@ -33,12 +36,13 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/mensajeros',
     '/dashboard/directorio',
     '/dashboard/onboarding',
-    '/dashboard/onboarding/registro',
   ],
-  coordinador: ['/dashboard'],
-  // Rol restringido: solo su área de trabajo (registrar/editar
-  // colaboradores) — no ve el resto del panel ni Configuración.
-  onboarding: ['/dashboard/onboarding/registro'],
+  // Rol restringido: solo la pestaña Gestión.
+  coordinador: ['/dashboard/gestion'],
+  // Rol restringido: su área de trabajo (registrar/editar colaboradores) +
+  // el tablero de indicadores de Onboarding — no ve el resto del panel ni
+  // Configuración.
+  onboarding: ['/dashboard/onboarding/registro', '/dashboard/onboarding'],
 };
 
 const COOKIE_NAME = 'quick_session';
@@ -64,7 +68,7 @@ export async function verifySessionToken(token: string): Promise<SessionData | n
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
     const role = payload.role;
-    if (role !== 'admin' && role !== 'supervisor' && role !== 'coordinador') return null;
+    if (role !== 'admin' && role !== 'supervisor' && role !== 'coordinador' && role !== 'onboarding') return null;
     return { role, email: String(payload.email || ''), nombre: String(payload.nombre || '') };
   } catch {
     return null;

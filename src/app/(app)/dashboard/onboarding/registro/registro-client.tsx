@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { Plus, X, AlertTriangle, History, ShieldOff, ShieldCheck, MessageSquarePlus } from 'lucide-react';
+import { Plus, X, AlertTriangle, History, ShieldOff, ShieldCheck, MessageSquarePlus, Copy, ExternalLink, Check } from 'lucide-react';
 import type { ColaboradorRow, ColaboradorInput, ColaboradorHistorialEntry } from '@/lib/colaboradores';
 import { TIPOS_IDENTIFICACION, TIPOS_VEHICULO, MEDIOS_VINCULACION, CIUDADES_COLOMBIA } from '@/lib/colaboradores-constants';
+import type { ServiceRow } from '@/lib/sheets';
+import { getServiciosDeVinculado } from '../actions';
 import {
   createColaboradorAction,
   updateColaboradorAction,
@@ -20,6 +22,19 @@ const inputCls =
   'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]';
 const labelCls = 'mb-1 block text-xs font-semibold text-[var(--text-secondary)]';
 const ALERT_DIAS = 5;
+const up = (s: string) => s.toUpperCase();
+
+const REGISTRO_PUBLICO_PATH = '/registro-colaborador';
+
+// Colores de fila según estado del colaborador:
+// rojo = inactivo · naranja = alerta (5+ días sin gestión) · verde = ya
+// gestiona (y no está en alerta) · azul = activo, nuevo, aún sin gestionar.
+function rowTint(r: Row): string {
+  if (r.estado === 'INACTIVO') return 'bg-red-500/[0.06] hover:bg-red-500/[0.1]';
+  if (r.diasSinServicio !== null && r.diasSinServicio >= ALERT_DIAS) return 'bg-amber-500/[0.07] hover:bg-amber-500/[0.12]';
+  if (r.totalGestiones > 0) return 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.1]';
+  return 'bg-sky-500/[0.06] hover:bg-sky-500/[0.1]';
+}
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   const [mounted, setMounted] = useState(false);
@@ -127,7 +142,7 @@ function ColaboradorForm({ initial, id, onClose }: { initial: Partial<Colaborado
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className={labelCls}>Nombre completo *</label>
-          <input value={form.nombreCompleto} onChange={(e) => set('nombreCompleto', e.target.value)} className={inputCls} placeholder="Nombre y apellidos" />
+          <input value={form.nombreCompleto} onChange={(e) => set('nombreCompleto', up(e.target.value))} className={inputCls} placeholder="Nombre y apellidos" />
         </div>
         <div>
           <label className={labelCls}>Tipo de identificación</label>
@@ -157,7 +172,7 @@ function ColaboradorForm({ initial, id, onClose }: { initial: Partial<Colaborado
         </div>
         <div>
           <label className={labelCls}>Ciudad</label>
-          <ComboInput id="ciudades-list" value={form.ciudad} onChange={(v) => set('ciudad', v)} options={CIUDADES_COLOMBIA} placeholder="Elige o escribe una ciudad" />
+          <ComboInput id="ciudades-list" value={form.ciudad} onChange={(v) => set('ciudad', up(v))} options={CIUDADES_COLOMBIA} placeholder="Elige o escribe una ciudad" />
         </div>
         <div>
           <label className={labelCls}>Teléfono</label>
@@ -193,10 +208,15 @@ function ColaboradorForm({ initial, id, onClose }: { initial: Partial<Colaborado
             ))}
           </select>
         </div>
-        <div>
-          <label className={labelCls}>Agilizador (quién vinculó)</label>
-          <input value={form.agilizador} onChange={(e) => set('agilizador', e.target.value)} className={inputCls} placeholder="Nombre del agilizador" />
-        </div>
+        {/* Al crear, el agilizador queda anclado automáticamente a quien está
+            creando el registro — solo se puede corregir manualmente al
+            editar (ej. si lo registró alguien más por encargo). */}
+        {id && (
+          <div>
+            <label className={labelCls}>Agilizador (quién vinculó)</label>
+            <input value={form.agilizador} onChange={(e) => set('agilizador', up(e.target.value))} className={inputCls} placeholder="Nombre del agilizador" />
+          </div>
+        )}
       </div>
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
       <div className="flex items-center justify-end gap-2 pt-1">
@@ -236,7 +256,7 @@ function InactivarForm({ row, onClose }: { row: Row; onClose: () => void }) {
       </p>
       <div>
         <label className={labelCls}>Motivo de inactivación *</label>
-        <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} className={`${inputCls} min-h-24`} placeholder="Ej. Renunció, no contesta, cambió de ciudad…" />
+        <textarea value={motivo} onChange={(e) => setMotivo(up(e.target.value))} className={`${inputCls} min-h-24`} placeholder="Ej. Renunció, no contesta, cambió de ciudad…" />
       </div>
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
       <div className="flex items-center justify-end gap-2 pt-1">
@@ -276,7 +296,7 @@ function ObservacionForm({ row, onClose }: { row: Row; onClose: () => void }) {
       </p>
       <div>
         <label className={labelCls}>Observación *</label>
-        <textarea value={obs} onChange={(e) => setObs(e.target.value)} className={`${inputCls} min-h-24`} placeholder="Ej. Dice que empieza la próxima semana…" />
+        <textarea value={obs} onChange={(e) => setObs(up(e.target.value))} className={`${inputCls} min-h-24`} placeholder="Ej. Dice que empieza la próxima semana…" />
       </div>
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
       <div className="flex items-center justify-end gap-2 pt-1">
@@ -326,6 +346,121 @@ function HistorialView({ id }: { id: number }) {
   );
 }
 
+function ColaboradorDetailPanel({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [servicios, setServicios] = useState<ServiceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!row) return;
+    setServicios([]);
+    setLoading(true);
+    let cancelled = false;
+    getServiciosDeVinculado(row.identificacion)
+      .then((rows) => {
+        if (!cancelled) setServicios(rows);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [row]);
+
+  useEffect(() => {
+    if (!row) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [row, onClose]);
+
+  if (!row || !mounted) return null;
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40 animate-fade-in-up bg-black/75 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-2xl md:inset-x-8 md:inset-y-6">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--accent-bright)]">Colaborador</p>
+            <h2 className="mt-0.5 text-lg font-bold text-[var(--text)]">{row.nombreCompleto}</h2>
+            <p className="text-xs text-[var(--text-muted)]">
+              {row.identificacion} · {row.ciudad} · {row.tipoVehiculo} · Agilizador: {row.agilizador || '—'}
+            </p>
+          </div>
+          <button onClick={onClose} className="flex-none rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--accent-bright)]" aria-label="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-auto p-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="panel-card rounded-xl p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Finalizados</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-400 tabular-nums">{row.cantFinalizados}</p>
+            </div>
+            <div className="panel-card rounded-xl p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">No efectivo</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--text-secondary)] tabular-nums">{row.cantNoEfectivo}</p>
+            </div>
+            <div className="panel-card rounded-xl p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Último servicio</p>
+              <p className="mt-1 text-sm font-bold text-[var(--text)]">{row.ultimoServicio || 'Nunca'}</p>
+            </div>
+            <div className="panel-card rounded-xl p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Días sin gestionar</p>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${row.diasSinServicio !== null && row.diasSinServicio >= ALERT_DIAS ? 'text-amber-400' : 'text-[var(--text)]'}`}>
+                {row.diasSinServicio ?? '—'}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--accent-bright)]">
+              Servicios gestionados ({servicios.length})
+            </h3>
+            {loading ? (
+              <p className="py-8 text-center text-sm text-[var(--text-muted)]">Cargando…</p>
+            ) : servicios.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[var(--text-muted)]">Aún no ha gestionado ningún servicio.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+                <table className="w-full min-w-[640px] border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      {['ID servicio', 'Proyecto', 'Estado', 'Ciudad', 'Fecha solicitud'].map((h) => (
+                        <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {servicios.map((s) => (
+                      <tr key={s.id} className="border-b border-[var(--border)]">
+                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-[var(--text)]">{s.id}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{s.proyecto}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{s.estado}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{s.ciudad}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-[var(--text-secondary)]">{s.fechaSolicitud}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 const tabBtnCls = (active: boolean) =>
   `rounded-md px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
     active ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -342,6 +477,20 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
   const [observacionRow, setObservacionRow] = useState<Row | null>(null);
   const [historialId, setHistorialId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [detailRow, setDetailRow] = useState<Row | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const registroPublicoUrl = typeof window !== 'undefined' ? `${window.location.origin}${REGISTRO_PUBLICO_PATH}` : REGISTRO_PUBLICO_PATH;
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(registroPublicoUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Si el navegador bloquea el portapapeles, al menos queda el botón de abrir.
+    }
+  }
 
   const activos = colaboradores.filter((c) => c.estado === 'ACTIVO');
   const inactivos = colaboradores.filter((c) => c.estado === 'INACTIVO');
@@ -394,17 +543,36 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
         </button>
       </div>
 
-      <div className="mb-5 flex items-center justify-between gap-2">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1 rounded-lg bg-[var(--surface-sunken)] p-1 w-fit">
           <button onClick={() => setEstadoTab('activo')} className={tabBtnCls(estadoTab === 'activo')}>Activos</button>
           <button onClick={() => setEstadoTab('inactivo')} className={tabBtnCls(estadoTab === 'inactivo')}>Inactivos</button>
         </div>
-        <button
-          onClick={() => setFormModal({ initial: emptyInput() })}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
-        >
-          <Plus size={14} /> Nuevo colaborador
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyLink}
+            title={registroPublicoUrl}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+          >
+            {linkCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+            {linkCopied ? 'Copiado' : 'Copiar link de registro'}
+          </button>
+          <a
+            href={REGISTRO_PUBLICO_PATH}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir formulario público"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+          >
+            <ExternalLink size={14} />
+          </a>
+          <button
+            onClick={() => setFormModal({ initial: emptyInput() })}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-gold px-3 py-2 text-xs font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98]"
+          >
+            <Plus size={14} /> Nuevo colaborador
+          </button>
+        </div>
       </div>
 
       <div className="mb-3 flex flex-wrap items-end gap-2.5">
@@ -436,6 +604,13 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
         />
       </div>
 
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" /> Ya gestiona</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500/60" /> Nuevo, aún sin gestionar</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> {ALERT_DIAS}+ días sin gestionar</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500/60" /> Inactivo</span>
+      </div>
+
       <div className="panel-card overflow-hidden rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
@@ -455,7 +630,11 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                 </tr>
               ) : (
                 filtered.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                  <tr
+                    key={r.id}
+                    onClick={() => setDetailRow(r)}
+                    className={`cursor-pointer border-b border-[var(--border)] transition-colors ${rowTint(r)}`}
+                  >
                     <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-[var(--text)]">
                       {r.nombreCompleto}
                       {r.origenRegistro === 'formulario' && (
@@ -481,7 +660,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                       )}
                     </td>
                     {estadoTab === 'inactivo' && <td className="max-w-[220px] whitespace-normal px-3 py-2.5 text-[var(--text-secondary)]">{r.motivoInactivacion || '—'}</td>}
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2.5">
                         <button onClick={() => setHistorialId(r.id)} title="Historial" className="text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-bright)]">
                           <History size={14} />
@@ -536,6 +715,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
           <HistorialView id={historialId} />
         </Modal>
       )}
+      <ColaboradorDetailPanel row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   );
 }

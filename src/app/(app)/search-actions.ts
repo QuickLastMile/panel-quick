@@ -11,7 +11,7 @@ const MAX_RESULTS = 20;
 // para tener un buscador — acá se busca contra el snapshot cacheado y solo
 // se devuelven las filas que coinciden.
 export async function searchServicios(query: string): Promise<ServiceRow[]> {
-  await requireRole(['admin', 'supervisor', 'coordinador']);
+  await requireRole(['admin', 'supervisor', 'coordinador', 'onboarding']);
   const q = query.trim().toLowerCase();
   if (q.length < 2) return [];
 

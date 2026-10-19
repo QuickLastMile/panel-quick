@@ -66,7 +66,7 @@ export default function RegistroPublicoForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
         <label className={labelCls}>Nombre completo *</label>
-        <input value={form.nombreCompleto} onChange={(e) => set('nombreCompleto', e.target.value)} className={inputCls} placeholder="Nombre y apellidos" />
+        <input value={form.nombreCompleto} onChange={(e) => set('nombreCompleto', e.target.value.toUpperCase())} className={inputCls} placeholder="Nombre y apellidos" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -89,7 +89,7 @@ export default function RegistroPublicoForm() {
         </div>
         <div>
           <label className={labelCls}>Ciudad</label>
-          <input value={form.ciudad} onChange={(e) => set('ciudad', e.target.value)} className={inputCls} list="ciudades" placeholder="Tu ciudad" autoComplete="off" />
+          <input value={form.ciudad} onChange={(e) => set('ciudad', e.target.value.toUpperCase())} className={inputCls} list="ciudades" placeholder="Tu ciudad" autoComplete="off" />
           <datalist id="ciudades">
             {CIUDADES_COLOMBIA.map((c) => (
               <option key={c} value={c} />
@@ -131,7 +131,7 @@ export default function RegistroPublicoForm() {
       </div>
       <div>
         <label className={labelCls}>¿Quién te contactó? (agilizador, si lo conoces)</label>
-        <input value={form.agilizador} onChange={(e) => set('agilizador', e.target.value)} className={inputCls} placeholder="Opcional" />
+        <input value={form.agilizador} onChange={(e) => set('agilizador', e.target.value.toUpperCase())} className={inputCls} placeholder="Opcional" />
       </div>
 
       {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}

@@ -217,7 +217,7 @@ export async function createColaborador(
       input.tipoIdentificacion,
       identificacion,
       input.fechaVinculacion || null,
-      input.ciudad.trim(),
+      input.ciudad.trim().toUpperCase(),
       input.telefono.replace(/[^0-9]/g, ''),
       input.telefonoEmergencia.replace(/[^0-9]/g, ''),
       input.fechaNacimiento || null,
@@ -225,7 +225,7 @@ export async function createColaborador(
       input.tipoVehiculo,
       input.medioVinculacion,
       origenRegistro === 'formulario' ? null : usuario,
-      input.agilizador || (origenRegistro === 'formulario' ? '' : usuario),
+      (input.agilizador || (origenRegistro === 'formulario' ? '' : usuario)).toUpperCase(),
       origenRegistro,
     ]
   );
@@ -264,14 +264,14 @@ export async function updateColaborador(id: number, input: ColaboradorInput, usu
     nombreCompleto: input.nombreCompleto.trim().toUpperCase(),
     tipoIdentificacion: input.tipoIdentificacion,
     fechaVinculacion: input.fechaVinculacion || '',
-    ciudad: input.ciudad.trim(),
+    ciudad: input.ciudad.trim().toUpperCase(),
     telefono: input.telefono.replace(/[^0-9]/g, ''),
     telefonoEmergencia: input.telefonoEmergencia.replace(/[^0-9]/g, ''),
     fechaNacimiento: input.fechaNacimiento || '',
     placa,
     tipoVehiculo: input.tipoVehiculo,
     medioVinculacion: input.medioVinculacion,
-    agilizador: input.agilizador,
+    agilizador: input.agilizador.toUpperCase(),
   };
 
   const historial: { campo: string; antes: string; despues: string }[] = [];
@@ -329,7 +329,7 @@ export async function setColaboradorEstado(
 
   await db.query(
     `UPDATE public.colaboradores SET estado=$1, motivo_inactivacion=$2, actualizado_en=now() WHERE id=$3`,
-    [estado, estado === 'INACTIVO' ? motivo!.trim() : null, id]
+    [estado, estado === 'INACTIVO' ? motivo!.trim().toUpperCase() : null, id]
   );
 
   await db.query(
@@ -341,7 +341,7 @@ export async function setColaboradorEstado(
     await db.query(
       `INSERT INTO public.colaboradores_historial (colaborador_id, usuario, campo, valor_anterior, valor_nuevo)
        VALUES ($1,$2,'motivo_inactivacion',$3,$4)`,
-      [id, usuario, before.motivo_inactivacion || '', motivo!.trim()]
+      [id, usuario, before.motivo_inactivacion || '', motivo!.trim().toUpperCase()]
     );
   }
   invalidateCache();
@@ -353,14 +353,15 @@ export async function setColaboradorObservacion(id: number, observacion: string,
   if (current.rowCount === 0) throw new Error('Colaborador no encontrado.');
   const before = toStr((current.rows[0] as Record<string, unknown>).observacion_no_prestacion);
 
+  const observacionUpper = observacion.trim().toUpperCase();
   await db.query(
     `UPDATE public.colaboradores SET observacion_no_prestacion=$1, actualizado_en=now() WHERE id=$2`,
-    [observacion.trim(), id]
+    [observacionUpper, id]
   );
   await db.query(
     `INSERT INTO public.colaboradores_historial (colaborador_id, usuario, campo, valor_anterior, valor_nuevo)
      VALUES ($1,$2,'observacion_no_prestacion',$3,$4)`,
-    [id, usuario, before, observacion.trim()]
+    [id, usuario, before, observacionUpper]
   );
   invalidateCache();
 }

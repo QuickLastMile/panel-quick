@@ -12,7 +12,7 @@ function isoToParts(iso: string | null) {
 }
 
 export default async function RegistroColaboradoresPage() {
-  const role = await requireRole(['admin', 'supervisor', 'onboarding']);
+  const role = await requireRole(['admin', 'onboarding']);
   const base = await getColaboradoresConStats();
   const today = bogotaToday();
 
