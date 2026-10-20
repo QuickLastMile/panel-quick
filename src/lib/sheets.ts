@@ -22,9 +22,15 @@ export type ServiceRow = {
   // del Sheet (no hay columna para esto ahí) — se calcula acá cruzando
   // contra BASE, igual que hace la fórmula del Sheet para tipoAsignador.
   tipoCancelacion: string;
+  // Igual que nombreAsignador, pero para quien canceló.
+  nombreCancelador: string;
   // "ID-Nombre" de quién asignó el servicio — es la clave con la que la
   // hoja BASE resuelve GESTOR/CARGO GESTOR/TIPO ASIGNADOR.
   usuarioAsignacion: string;
+  // Nombre real de quien asignó, tal cual aparece en la data ("ID-Nombre"
+  // sin el ID) — a diferencia de `gestor`, nunca se reemplaza por "AGILIZADOR
+  // NO ASIGNADO": si no está en BASE, igual se quiere ver quién fue.
+  nombreAsignador: string;
   diaSolicitud: number | null;
   anioSolicitud: number | null;
   mesNumSolicitud: number | null;
@@ -95,6 +101,15 @@ function getPool(): Pool {
   return pool;
 }
 
+// "455892-Miguel Angel Pirateque Lozano" -> "Miguel Angel Pirateque Lozano".
+// Siempre el nombre real tal cual viene en la data, sin pasar por BASE —
+// para no perder de vista quién hizo algo solo porque no está clasificado.
+function nombreDesdeIdNombre(idNombre: string): string {
+  const s = idNombre.trim();
+  const dash = s.indexOf('-');
+  return (dash >= 0 ? s.slice(dash + 1) : s).trim();
+}
+
 const toNum = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
@@ -147,7 +162,9 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       descCancelacion: toStr(r.desc_cancelacion),
       usuarioCancelacion: toStr(r.usuario_cancelacion),
       tipoCancelacion: tipoCancelacionFor(toStr(r.usuario_cancelacion)),
+      nombreCancelador: nombreDesdeIdNombre(toStr(r.usuario_cancelacion)),
       usuarioAsignacion: toStr(r.usuario_asignacion),
+      nombreAsignador: nombreDesdeIdNombre(toStr(r.usuario_asignacion)),
       diaSolicitud: toNum(r.dia_solicitud),
       anioSolicitud: toNum(r.anio_solicitud),
       mesNumSolicitud: toNum(r.mes_num_solicitud),

@@ -79,7 +79,7 @@ export default function ServiceDetailPanel({ row, onClose }: { row: ServiceRow |
         <div className="flex-1 space-y-5 overflow-auto p-5">
           <Section title="Organización">
             <Field label="Proyecto" value={row.proyecto} />
-            <Field label="Gestor" value={row.gestor} />
+            <Field label="Gestor" value={row.nombreAsignador} />
             <Field label="Jefatura" value={row.jefatura} />
           </Section>
 

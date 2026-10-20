@@ -22,7 +22,10 @@ const BASE_COLS: Col[] = [
   { key: 'ciudad', label: 'Ciudad', width: 120 },
   { key: 'fechaCreacion', label: 'Fecha creación', width: 120 },
   { key: 'horaCreacion', label: 'Hora creación', width: 110 },
-  { key: 'gestor', label: 'Gestor', width: 160 },
+  // Nombre real de quien asignó, tal cual aparece en la data — no el
+  // "AGILIZADOR NO ASIGNADO" genérico de BASE cuando no está clasificado.
+  { key: 'nombreAsignador', label: 'Gestor', width: 180 },
+  { key: 'tipoAsignador', label: 'Tipo', width: 150 },
 ];
 const CONDUCTOR_COLS: Col[] = [
   { key: 'nombreTrabajador', label: 'Trabajador', width: 180 },
@@ -37,7 +40,8 @@ function columnsFor(group: string): Col[] {
       ...BASE_COLS,
       ...CONDUCTOR_COLS,
       { key: 'razonCancelacion', label: 'Motivo', width: 180 },
-      { key: 'usuarioCancelacion', label: 'Canceló', width: 200 },
+      { key: 'nombreCancelador', label: 'Canceló', width: 200 },
+      { key: 'tipoCancelacion', label: 'Tipo cancelación', width: 150 },
     ];
   return BASE_COLS;
 }
