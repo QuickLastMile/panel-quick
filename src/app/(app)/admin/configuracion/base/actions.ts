@@ -29,7 +29,6 @@ export async function saveColaborador(row: {
   cargo: string;
   ext: string;
   colaborador: string;
-  tipo: string;
 }): Promise<{ error?: string }> {
   await requireRole(['admin']);
   const session = await getSession();

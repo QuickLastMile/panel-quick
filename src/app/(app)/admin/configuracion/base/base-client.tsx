@@ -154,19 +154,16 @@ function ColaboradorForm({
   initial,
   onClose,
   gestoresExistentes,
-  tiposExistentes,
 }: {
   initial: Partial<ColaboradorBaseRow>;
   onClose: () => void;
   gestoresExistentes: string[];
-  tiposExistentes: string[];
 }) {
   const router = useRouter();
   const [colaboradorData, setColaboradorData] = useState(initial.colaboradorData || '');
   const [cargo, setCargo] = useState(initial.cargo || '');
   const [ext, setExt] = useState(initial.ext || '');
   const [colaborador, setColaborador] = useState(initial.colaborador || '');
-  const [tipo, setTipo] = useState(initial.tipo || 'AGILIZADOR');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -178,7 +175,7 @@ function ColaboradorForm({
     }
     setSaving(true);
     setError('');
-    const res = await saveColaborador({ rowNumber: initial.rowNumber, colaboradorData, cargo, ext, colaborador, tipo });
+    const res = await saveColaborador({ rowNumber: initial.rowNumber, colaboradorData, cargo, ext, colaborador });
     setSaving(false);
     if (res.error) {
       setError(res.error);
@@ -207,6 +204,9 @@ function ColaboradorForm({
         <div>
           <label className={labelCls}>Cargo</label>
           <input value={cargo} onChange={(e) => setCargo(e.target.value)} className={inputCls} placeholder="Ej. AGILIZADOR" />
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+            AGILIZADOR, SUPERVISOR, VACACIONES, ADMINISTRATIVO o AGILIZADOR NO ASIGNADO — es el único campo de clasificación.
+          </p>
         </div>
         <div>
           <label className={labelCls}>Extensión</label>
@@ -220,16 +220,6 @@ function ColaboradorForm({
           value={colaborador}
           onChange={setColaborador}
           options={gestoresExistentes}
-          placeholder="Elige uno existente o escribe uno nuevo"
-        />
-      </div>
-      <div>
-        <label className={labelCls}>Tipo</label>
-        <ComboInput
-          id="tipos-list"
-          value={tipo}
-          onChange={setTipo}
-          options={Array.from(new Set(['AGILIZADOR', 'OTRO', ...tiposExistentes]))}
           placeholder="Elige uno existente o escribe uno nuevo"
         />
       </div>
@@ -258,7 +248,6 @@ export default function BaseClient({
   colaboradoresSinClasificar,
   jefaturasExistentes,
   gestoresExistentes,
-  tiposExistentes,
 }: {
   proyectoRows: ProyectoBaseRow[];
   colaboradorRows: ColaboradorBaseRow[];
@@ -266,7 +255,6 @@ export default function BaseClient({
   colaboradoresSinClasificar: { colaboradorData: string; count: number }[];
   jefaturasExistentes: string[];
   gestoresExistentes: string[];
-  tiposExistentes: string[];
 }) {
   const [tab, setTab] = useState<'proyecto' | 'colaborador'>('proyecto');
   const [proyectoSubTab, setProyectoSubTab] = useState<'especificado' | 'no-especificado'>('especificado');
@@ -284,7 +272,7 @@ export default function BaseClient({
   const filteredColaboradores = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return colaboradorRows;
-    return colaboradorRows.filter((r) => `${r.colaboradorData} ${r.cargo} ${r.colaborador} ${r.tipo}`.toLowerCase().includes(q));
+    return colaboradorRows.filter((r) => `${r.colaboradorData} ${r.cargo} ${r.colaborador}`.toLowerCase().includes(q));
   }, [colaboradorRows, search]);
 
   return (
@@ -482,7 +470,7 @@ export default function BaseClient({
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
-                      {['Colaborador (ID-Nombre)', 'Cargo', 'Ext.', 'Nombre', 'Tipo', ''].map((h) => (
+                      {['Colaborador (ID-Nombre)', 'Cargo', 'Ext.', 'Nombre', ''].map((h) => (
                         <th key={h} className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
                           {h}
                         </th>
@@ -492,7 +480,7 @@ export default function BaseClient({
                   <tbody>
                     {filteredColaboradores.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
+                        <td colSpan={5} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
                       </tr>
                     ) : (
                       filteredColaboradores.map((r) => (
@@ -501,7 +489,6 @@ export default function BaseClient({
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.cargo}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.ext}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.colaborador}</td>
-                          <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.tipo}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-right">
                             <button onClick={() => setColaboradorModal(r)} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
                               Editar
@@ -530,7 +517,6 @@ export default function BaseClient({
             initial={colaboradorModal}
             onClose={() => setColaboradorModal(null)}
             gestoresExistentes={gestoresExistentes}
-            tiposExistentes={tiposExistentes}
           />
         </Modal>
       )}

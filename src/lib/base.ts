@@ -143,7 +143,6 @@ export async function saveColaboradorBaseRow(
     cargo: string;
     ext: string;
     colaborador: string;
-    tipo: string;
   },
   usuario: string
 ): Promise<void> {
@@ -152,7 +151,14 @@ export async function saveColaboradorBaseRow(
   const cargo = row.cargo.trim();
   const ext = row.ext.trim();
   const colaborador = row.colaborador.trim();
-  const tipo = row.tipo.trim();
+  // TIPO (columna L) ya no se captura por separado: según el archivo de
+  // referencia de la usuaria, CARGO es el único campo de clasificación
+  // (AGILIZADOR / SUPERVISOR / VACACIONES / ADMINISTRATIVO / AGILIZADOR NO
+  // ASIGNADO) — tener los dos por separado fue lo que causó que se
+  // desincronizaran para la misma persona. Se escribe siempre igual a
+  // CARGO para que TIPO ASIGNADOR (que se calcula cruzando contra esta
+  // columna) nunca vuelva a divergir.
+  const tipo = cargo;
   // "conca" y "MAYUS" (columnas J y K) son derivadas — las fórmulas de
   // Datos_Actuales las leen directo, así que hay que escribirlas también o
   // el cruce de CARGO GESTOR / GESTOR quedaría en blanco para filas nuevas.
@@ -176,7 +182,6 @@ export async function saveColaboradorBaseRow(
       ['Cargo', before?.cargo || '', cargo],
       ['Extensión', before?.ext || '', ext],
       ['Nombre del colaborador', before?.colaborador || '', colaborador],
-      ['Tipo', before?.tipo || '', tipo],
     ];
     for (const [campo, antes, despues] of campos) {
       if (antes !== despues) {

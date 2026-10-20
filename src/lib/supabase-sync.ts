@@ -5,6 +5,7 @@
 // resueltos por las fórmulas del Sheet).
 import { google } from 'googleapis';
 import { Pool } from 'pg';
+import { getColaboradorBaseRows, saveColaboradorBaseRow } from './base';
 
 const SHEET_RANGE = 'Datos_Actuales!A:DZ';
 
@@ -137,6 +138,39 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
   ];
 }
 
+// Registra en BASE a cualquier asignador/cancelador que todavía no esté
+// ahí, con CARGO = AGILIZADOR NO ASIGNADO — mismo criterio que la
+// automatización local (automation/lib/base.mjs), para que siempre haya un
+// responsable identificable sin importar qué camino de sincronización se
+// usó (automatización en el PC vs. este botón "Actualizar ahora").
+const AGILIZADOR_NO_ASIGNADO = 'AGILIZADOR NO ASIGNADO';
+
+function parseIdNombre(idNombre: string): { ext: string; nombre: string } {
+  const s = idNombre.trim();
+  const dash = s.indexOf('-');
+  if (dash < 0) return { ext: '', nombre: s };
+  return { ext: s.slice(0, dash).trim(), nombre: s.slice(dash + 1).trim() };
+}
+
+async function ensureColaboradoresRegistered(idNombreValues: string[]): Promise<void> {
+  const vistos = [...new Set(idNombreValues.map((v) => v.trim()).filter(Boolean))];
+  if (!vistos.length) return;
+
+  const existing = await getColaboradorBaseRows();
+  const existingSet = new Set(existing.map((r) => r.colaboradorData));
+  const nuevos = vistos.filter((v) => !existingSet.has(v));
+  if (!nuevos.length) return;
+
+  for (const idNombre of nuevos) {
+    const { ext, nombre } = parseIdNombre(idNombre);
+    const colaborador = nombre.toUpperCase();
+    await saveColaboradorBaseRow(
+      { colaboradorData: idNombre, cargo: AGILIZADOR_NO_ASIGNADO, ext, colaborador },
+      'Automatización'
+    );
+  }
+}
+
 export async function fetchSheetRowsByIds(ids: string[]): Promise<DbRow[]> {
   if (!ids.length) return [];
   const wanted = new Set(ids.map(String));
@@ -160,10 +194,24 @@ export async function fetchSheetRowsByIds(ids: string[]): Promise<DbRow[]> {
     idx[key] = headers.indexOf(header);
   }
 
-  return values
-    .slice(1)
-    .filter((row) => wanted.has(String(row[idx.id])))
-    .map((row) => toDbRow(row, idx));
+  const matched = values.slice(1).filter((row) => wanted.has(String(row[idx.id])));
+
+  const vistos: string[] = [];
+  for (const row of matched) {
+    const asig = getStr(row, idx.usuarioAsignacion);
+    const cancel = getStr(row, idx.usuarioCancelacion);
+    if (asig) vistos.push(asig);
+    if (cancel) vistos.push(cancel);
+  }
+  if (vistos.length) {
+    try {
+      await ensureColaboradoresRegistered(vistos);
+    } catch (error) {
+      console.log(`Aviso: no se pudo registrar automáticamente en BASE (${(error as Error).message}).`);
+    }
+  }
+
+  return matched.map((row) => toDbRow(row, idx));
 }
 
 let pool: Pool | null = null;
