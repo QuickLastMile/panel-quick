@@ -80,6 +80,16 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
+// Filas creadas antes de corregir la fórmula del Sheet todavía traen
+// "OTRO" o el error crudo "#N/A (Did not find value...)" grabado en la
+// celda — se normaliza acá en vez de depender de que cada fila individual
+// tenga la fórmula al día (ver mismo fix en automation/lib/supabase-sync.mjs).
+function normalizeTipo(value: string): string {
+  const v = value.trim();
+  if (!v || v === 'OTRO' || v.toUpperCase().startsWith('#N/A')) return 'AGILIZADOR NO ASIGNADO';
+  return v;
+}
+
 function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
   const dia = getNum(row, idx.diaSolicitud);
   const mes = getNum(row, idx.mesNumSolicitud);
@@ -89,7 +99,7 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
   return [
     getStr(row, idx.id),
     getStr(row, idx.proyecto) || null,
-    getStr(row, idx.gestor) || null,
+    normalizeTipo(getStr(row, idx.gestor)) || null,
     getStr(row, idx.cargoGestor) || null,
     getStr(row, idx.estado) || null,
     getStr(row, idx.ciudad) || null,
@@ -121,7 +131,7 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
     getStr(row, idx.descripcion) || null,
     getNum(row, idx.diasAnticipadosCreacion),
     getStr(row, idx.fechaHoraAsignado) || null,
-    getStr(row, idx.tipoAsignador) || null,
+    normalizeTipo(getStr(row, idx.tipoAsignador)) || null,
     getStr(row, idx.horaAsignacion) || null,
     getNum(row, idx.minutosAsignacion),
   ];
