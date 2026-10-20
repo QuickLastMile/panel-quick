@@ -1,4 +1,3 @@
-import { MapPin } from 'lucide-react';
 import RegistroPublicoForm from './registro-publico-form';
 
 export default function RegistroColaboradorPublicoPage() {
@@ -10,13 +9,12 @@ export default function RegistroColaboradorPublicoPage() {
       />
       <div className="relative w-full max-w-md animate-fade-in-up rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-2xl shadow-black/40">
         <div className="mb-6 flex flex-col items-center gap-1.5 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-gold text-lg font-black text-[#141008] shadow-[0_0_22px_rgba(214,164,25,0.3)]">
-            Q
-          </span>
-          <div className="mt-1 flex items-center text-3xl font-black tracking-tight text-[var(--text)]">
-            <span>G</span>
-            <MapPin size={26} strokeWidth={2.5} className="text-[var(--accent-bright)]" fill="var(--accent-soft)" />
-          </div>
+          <img
+            src="/icons/icon-192.png"
+            alt="Quick"
+            className="h-16 w-16 rounded-2xl shadow-[0_0_22px_rgba(214,164,25,0.3)]"
+          />
+          <p className="mt-1 text-xl font-black tracking-tight text-[var(--text)]">Quick GO</p>
           <p className="text-sm text-[var(--text-muted)]">Registro rápido de vinculación</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">Para agilizadores en campo — registra aquí al colaborador que acabas de vincular, sin necesidad de entrar al panel.</p>
         </div>

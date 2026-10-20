@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gauge, ClipboardList, Users, UserPlus, UserCog, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser, MapPin } from 'lucide-react';
+import { Gauge, ClipboardList, Users, UserPlus, UserCog, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser } from 'lucide-react';
 import { logout } from '@/app/login/actions';
 import type { Role } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/auth';
@@ -53,15 +53,14 @@ export default function Sidebar({ role, nombre, email }: { role: Role; nombre: s
       }`}
     >
       <div className={`relative flex items-center gap-2.5 px-5 pt-6 pb-5 ${collapsed ? 'justify-center px-0' : ''}`}>
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-gradient-gold text-sm font-black text-[#141008] shadow-[0_0_16px_rgba(214,164,25,0.25)]">
-          Q
-        </span>
+        <img
+          src="/icons/icon-192.png"
+          alt="Quick"
+          className="h-9 w-9 flex-none rounded-lg shadow-[0_0_16px_rgba(214,164,25,0.25)]"
+        />
         {!collapsed && (
           <div className="min-w-0">
-            <p className="flex items-center text-lg font-black tracking-tight">
-              <span>G</span>
-              <MapPin size={15} strokeWidth={2.5} className="text-[var(--accent-bright)]" fill="var(--accent-soft)" />
-            </p>
+            <p className="text-sm font-black tracking-tight">Quick GO</p>
             <p className="truncate text-[11px] leading-tight text-[var(--text-muted)]">Centro de Operaciones</p>
           </div>
         )}
