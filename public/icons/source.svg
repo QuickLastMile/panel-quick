@@ -7,11 +7,11 @@
     </linearGradient>
   </defs>
   <rect width="100" height="100" rx="22" fill="url(#gold)"/>
-  <!-- "Q" ring + tail, lower-left -->
-  <circle cx="40" cy="56" r="23" fill="none" stroke="#141008" stroke-width="13"/>
-  <line x1="55" y1="71" x2="71" y2="87" stroke="#141008" stroke-width="13" stroke-linecap="round"/>
-  <!-- location-pin badge, upper-right corner -->
-  <circle cx="76" cy="26" r="17" fill="#141008"/>
-  <path d="M76 15.5c-5.2 0-9.4 4.2-9.4 9.4 0 7 9.4 16.6 9.4 16.6s9.4-9.6 9.4-16.6c0-5.2-4.2-9.4-9.4-9.4z" fill="url(#gold)"/>
-  <circle cx="76" cy="25" r="3.2" fill="#141008"/>
+  <!-- "G" (open ring + bottom-right tab), left half -->
+  <path d="M44.14,35.86 A20,20 0 1 0 44.14,64.14"
+        fill="none" stroke="#141008" stroke-width="11" stroke-linecap="round"/>
+  <line x1="44.14" y1="64.14" x2="31" y2="64.14" stroke="#141008" stroke-width="11" stroke-linecap="round"/>
+  <!-- location-pin as the "O", right half -->
+  <path d="M73 33c-7.5 0-13.5 6-13.5 13.5 0 10 13.5 23.5 13.5 23.5s13.5-13.5 13.5-23.5c0-7.5-6-13.5-13.5-13.5z" fill="#141008"/>
+  <circle cx="73" cy="46.5" r="5.4" fill="url(#gold)"/>
 </svg>
