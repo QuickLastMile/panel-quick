@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { getColaboradorBaseRows } from './base';
 
 export type ServiceRow = {
   id: string;
@@ -15,6 +16,12 @@ export type ServiceRow = {
   descCancelacion: string;
   // Quién canceló el servicio (usuario de Quick) — vacío si no se canceló.
   usuarioCancelacion: string;
+  // Igual que tipoAsignador, pero para quien canceló — AGILIZADOR /
+  // SUPERVISOR / ADMINISTRATIVO / etc. según BASE, "AGILIZADOR NO
+  // ASIGNADO" si no está en BASE, o vacío si nunca se canceló. No viene
+  // del Sheet (no hay columna para esto ahí) — se calcula acá cruzando
+  // contra BASE, igual que hace la fórmula del Sheet para tipoAsignador.
+  tipoCancelacion: string;
   // "ID-Nombre" de quién asignó el servicio — es la clave con la que la
   // hoja BASE resuelve GESTOR/CARGO GESTOR/TIPO ASIGNADOR.
   usuarioAsignacion: string;
@@ -98,7 +105,7 @@ const toStr = (v: unknown): string => (v === null || v === undefined ? '' : Stri
 async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
   const db = getPool();
 
-  const [dataRes, syncRes] = await Promise.all([
+  const [dataRes, syncRes, colaboradorRows] = await Promise.all([
     db.query(
       `SELECT id, proyecto, gestor, cargo_gestor, estado, ciudad, direccion,
               nombre_trabajador, ident_trabajador, placa, razon_cancelacion,
@@ -111,9 +118,18 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
        FROM public.services`
     ),
     db.query(`SELECT max(updated_at) AS last FROM public.services`),
+    getColaboradorBaseRows(),
   ]);
 
   const lastSyncedAt = syncRes.rows[0]?.last ? new Date(syncRes.rows[0].last).toISOString() : null;
+
+  // Mismo cruce que hace la fórmula de TIPO ASIGNADOR en el Sheet, pero
+  // aplicado a quien CANCELÓ (no hay columna para eso en Datos_Actuales).
+  const tipoPorColaborador = new Map(colaboradorRows.map((c) => [c.colaboradorData, c.tipo]));
+  const tipoCancelacionFor = (usuarioCancelacion: string): string => {
+    if (!usuarioCancelacion) return '';
+    return tipoPorColaborador.get(usuarioCancelacion) || 'AGILIZADOR NO ASIGNADO';
+  };
 
   const rows: ServiceRow[] = dataRes.rows
     .map((r) => ({
@@ -130,6 +146,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
       razonCancelacion: toStr(r.razon_cancelacion),
       descCancelacion: toStr(r.desc_cancelacion),
       usuarioCancelacion: toStr(r.usuario_cancelacion),
+      tipoCancelacion: tipoCancelacionFor(toStr(r.usuario_cancelacion)),
       usuarioAsignacion: toStr(r.usuario_asignacion),
       diaSolicitud: toNum(r.dia_solicitud),
       anioSolicitud: toNum(r.anio_solicitud),

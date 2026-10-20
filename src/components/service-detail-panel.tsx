@@ -110,6 +110,11 @@ export default function ServiceDetailPanel({ row, onClose }: { row: ServiceRow |
             <Field label="Placa" value={asignado ? row.placa : ''} />
           </Section>
 
+          <Section title="Asignación">
+            <Field label="Usuario que asignó" value={row.usuarioAsignacion} />
+            <Field label="Tipo" value={row.tipoAsignador} />
+          </Section>
+
           <Section title="Financiero">
             <Field label="Valor declarado" value={money(row.valorDeclarado)} />
             <Field label="Precio total" value={money(row.precioTotal)} />
@@ -120,7 +125,8 @@ export default function ServiceDetailPanel({ row, onClose }: { row: ServiceRow |
             <Section title="Cancelación">
               <Field label="Razón de cancelación" value={row.razonCancelacion} />
               <Field label="Canceló" value={row.usuarioCancelacion} />
-              <div className="col-span-2 sm:col-span-2">
+              <Field label="Tipo" value={row.tipoCancelacion} />
+              <div className="col-span-2 sm:col-span-3">
                 <Field label="Descripción de cancelación" value={row.descCancelacion} />
               </div>
             </Section>
