@@ -169,6 +169,53 @@ function invalidateCache() {
   cached = null;
 }
 
+export type JustificacionEntry = {
+  id: number;
+  colaboradorId: number;
+  nombreCompleto: string;
+  // "AAAA-MM-DD" — día en que el encargado escribió la justificación (no el
+  // día que se está justificando, que normalmente es el mismo pero puede no
+  // serlo si se justifica en retrospectiva).
+  fecha: string;
+  usuario: string;
+  texto: string;
+  creadoEn: string;
+};
+
+// creado_en es timestamptz — hay que convertir a día de Bogotá, no cortar el
+// ISO en UTC crudo (cerca de medianoche eso corre la fecha un día).
+function toBogotaDateStr(v: unknown): string {
+  if (!v) return '';
+  const d = v instanceof Date ? v : new Date(String(v));
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+// Historial de "Agregar observación" (setColaboradorObservacion ya lo
+// guarda en colaboradores_historial con fecha — acá solo se lee agrupado
+// por día) — ver pestaña Onboarding, sección Justificaciones.
+export async function getJustificacionesHistorial(limit = 500): Promise<JustificacionEntry[]> {
+  const res = await getPool().query(
+    `SELECT h.id, h.colaborador_id, c.nombre_completo, h.usuario, h.valor_nuevo, h.creado_en
+     FROM public.colaboradores_historial h
+     JOIN public.colaboradores c ON c.id = h.colaborador_id
+     WHERE h.campo = 'observacion_no_prestacion' AND coalesce(h.valor_nuevo, '') <> ''
+     ORDER BY h.creado_en DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return res.rows.map((r) => ({
+    id: Number(r.id),
+    colaboradorId: Number(r.colaborador_id),
+    nombreCompleto: toStr(r.nombre_completo),
+    fecha: toBogotaDateStr(r.creado_en),
+    usuario: toStr(r.usuario),
+    texto: toStr(r.valor_nuevo),
+    creadoEn: toStr(r.creado_en),
+  }));
+}
+
 export async function getColaboradorHistorial(id: number): Promise<ColaboradorHistorialEntry[]> {
   const res = await getPool().query(
     `SELECT id, usuario, campo, valor_anterior, valor_nuevo, creado_en

@@ -1,10 +1,21 @@
 import { getOnboardingSnapshot } from '@/lib/onboarding';
+import { getColaboradoresConStats, getJustificacionesHistorial } from '@/lib/colaboradores';
 import { buildOnboardingKpis } from '@/lib/onboarding-aggregate';
-import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, isToday } from '@/lib/date-filter';
+import { parseDateFilterParams, filterRowsByDateField, formatDateFilterLabel, isToday, bogotaToday, daysBetween } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
 import OnboardingClient from './onboarding-client';
+import JustificacionesPanel from './justificaciones-panel';
+
+const ALERT_DIAS = 5;
+
+function isoToParts(iso: string | null) {
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return { year: y, month: m, day: d };
+}
 
 // Agilizador al que se le hace seguimiento puntual de meta (5/día, 130/mes).
 const AGILIZADOR_SEGUIMIENTO = 'ZAMIR ANDRES ARCIA';
@@ -25,7 +36,24 @@ export default async function OnboardingPage({
   // cuando se leía del Sheet.
   const filter = parseDateFilterParams(await searchParams);
 
-  const { rows: allRows } = await getOnboardingSnapshot();
+  const [{ rows: allRows }, colaboradoresBase, justificaciones] = await Promise.all([
+    getOnboardingSnapshot(),
+    getColaboradoresConStats(),
+    getJustificacionesHistorial(),
+  ]);
+
+  const hoy = bogotaToday();
+  const hoyIso = `${hoy.year}-${String(hoy.month).padStart(2, '0')}-${String(hoy.day).padStart(2, '0')}`;
+  // Mismo criterio que la pestaña Vinculación (ALERT_DIAS): desde el último
+  // servicio si ya tuvo alguno, si no desde que se vinculó.
+  const alertados = colaboradoresBase
+    .filter((c) => c.estado === 'ACTIVO')
+    .map((c) => {
+      const ref = isoToParts(c.ultimoServicioDate) || isoToParts(c.fechaVinculacion);
+      const diasSinServicio = ref ? daysBetween(ref, hoy) : null;
+      return { id: c.id, nombreCompleto: c.nombreCompleto, diasSinServicio };
+    })
+    .filter((c): c is { id: number; nombreCompleto: string; diasSinServicio: number } => c.diasSinServicio !== null && c.diasSinServicio >= ALERT_DIAS);
 
   const rows = filterRowsByDateField(allRows, filter, (r) => r.fechaVinculacion);
   // "Vinculados [día]" usa el día/mes que esté seleccionado en el filtro de
@@ -53,6 +81,8 @@ export default async function OnboardingPage({
         isFilteredToday={isToday(filter)}
         filterLabel={formatDateFilterLabel(filter)}
       />
+
+      <JustificacionesPanel alertados={alertados} justificaciones={justificaciones} hoy={hoyIso} />
     </div>
   );
 }
