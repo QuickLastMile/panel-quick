@@ -20,6 +20,10 @@ export type CancelacionData = {
   porDia: DiaStat[];
   porProyecto: KeyStat[];
   porJefatura: KeyStat[];
+  porVehiculo: KeyStat[];
+  // Cantidad de cancelaciones por gestor — TODAS las canceladas (no solo
+  // las que cuentan como pérdida), a diferencia de porProyecto/porJefatura.
+  porGestor: KeyStat[];
 };
 
 const CANCELADO_ESTADOS = new Set(['Cancelado', 'Finalizado Cancelado']);
@@ -34,6 +38,8 @@ export function buildCancelacionData(allRows: ServiceRow[], motivosCuentan: Set<
   const porDiaMap: Record<string, { mesLabel: string; mes: string; count: number; valor: number }> = {};
   const porProyectoMap: Record<string, { count: number; valor: number }> = {};
   const porJefaturaMap: Record<string, { count: number; valor: number }> = {};
+  const porVehiculoMap: Record<string, { count: number; valor: number }> = {};
+  const porGestorMap: Record<string, { count: number; valor: number }> = {};
 
   let totalQueCuentan = 0;
   let valorPerdido = 0;
@@ -46,6 +52,11 @@ export function buildCancelacionData(allRows: ServiceRow[], motivosCuentan: Set<
     if (!porMotivoMap[motivo]) porMotivoMap[motivo] = { count: 0, valor: 0 };
     porMotivoMap[motivo].count += 1;
     if (cuenta) porMotivoMap[motivo].valor += valor;
+
+    const gestor = r.gestor || 'SIN GESTOR';
+    if (!porGestorMap[gestor]) porGestorMap[gestor] = { count: 0, valor: 0 };
+    porGestorMap[gestor].count += 1;
+    if (cuenta) porGestorMap[gestor].valor += valor;
 
     if (cuenta) {
       totalQueCuentan += 1;
@@ -77,6 +88,11 @@ export function buildCancelacionData(allRows: ServiceRow[], motivosCuentan: Set<
         porJefaturaMap[j].count += 1;
         porJefaturaMap[j].valor += valor;
       }
+
+      const vehiculo = r.tipoVehiculo.trim() || 'SIN VEHÍCULO';
+      if (!porVehiculoMap[vehiculo]) porVehiculoMap[vehiculo] = { count: 0, valor: 0 };
+      porVehiculoMap[vehiculo].count += 1;
+      porVehiculoMap[vehiculo].valor += valor;
     }
   });
 
@@ -103,6 +119,18 @@ export function buildCancelacionData(allRows: ServiceRow[], motivosCuentan: Set<
     .map(([key, v]) => ({ key, ...v }))
     .sort((a, b) => b.valor - a.valor);
 
+  const porVehiculo: KeyStat[] = Object.entries(porVehiculoMap)
+    .map(([key, v]) => ({ key, ...v }))
+    .sort((a, b) => b.valor - a.valor);
+
+  // Top 15 — con ~450 colaboradores registrados la cola larga no aporta,
+  // solo alarga la lista (a diferencia de motivo/proyecto/jefatura, que son
+  // pocos valores posibles y no hace falta recortar).
+  const porGestor: KeyStat[] = Object.entries(porGestorMap)
+    .map(([key, v]) => ({ key, ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 15);
+
   return {
     totalCancelaciones: rows.length,
     totalQueCuentan,
@@ -112,5 +140,7 @@ export function buildCancelacionData(allRows: ServiceRow[], motivosCuentan: Set<
     porDia,
     porProyecto,
     porJefatura,
+    porVehiculo,
+    porGestor,
   };
 }

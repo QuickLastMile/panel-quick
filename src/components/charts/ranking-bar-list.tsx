@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useChartTooltip, ChartTooltip } from './chart-tooltip';
 
 export default function RankingBarList({
@@ -27,13 +28,17 @@ export default function RankingBarList({
     return `${base} (${pct}%)`;
   }
 
+  // Columna de valor a medida — fija en 42/90px se veía bien con conteos
+  // cortos, pero montos en pesos ("$3.685.344") no cabían y se cortaban.
+  // Se calcula del texto más largo ya formateado (vía variable CSS, para no
+  // perder el layout de 2 columnas + barra a ancho completo en mobile).
+  const longestValue = items.reduce((m, i) => Math.max(m, display(i.count).length), 0);
+  const valueColPx = Math.max(showPercent ? 90 : 42, Math.ceil(longestValue * 7.5 + 14));
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" style={{ '--value-col-w': `${valueColPx}px` } as CSSProperties}>
       {items.map((item) => (
-        <div
-          key={item.key}
-          className={`grid grid-cols-[minmax(0,1fr)_42px] items-center gap-3 ${showPercent ? 'sm:grid-cols-[210px_1fr_90px]' : 'sm:grid-cols-[210px_1fr_42px]'}`}
-        >
+        <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-3 sm:grid-cols-[210px_1fr_var(--value-col-w)]">
           <span className="truncate text-xs font-medium leading-tight text-[var(--text-secondary)]" title={item.key}>
             {item.key}
           </span>
