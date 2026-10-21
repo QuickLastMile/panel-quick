@@ -227,11 +227,15 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
   return { rows, lastSyncedAt };
 }
 
-// Se refresca sola cada 90s: cualquiera que abra el panel ve datos frescos
-// sin necesidad de un botón de "actualizar", y sin golpear la base en cada
-// carga de página.
+// Esta consulta trae ~118k filas y tarda 25-30s (ver sheets.ts más arriba)
+// — con un caché corto, casi cualquier navegación entre páginas vuelve a
+// pagar ese costo. Los datos de origen no cambian más seguido que cada
+// ~10 min (ciclo de la automatización), así que 8 min de caché no sirve
+// nada obsoleto que no lo fuera igual con 90s, pero sí evita repetir la
+// consulta lenta en cada clic — vive por instancia de función (Vercel
+// puede reusar una instancia "caliente" entre pedidos cercanos).
 let cached: { data: SheetsSnapshot; expiresAt: number } | null = null;
-const CACHE_TTL_MS = 90_000;
+const CACHE_TTL_MS = 8 * 60_000;
 
 export async function getSheetsSnapshot(): Promise<SheetsSnapshot> {
   if (cached && cached.expiresAt > Date.now()) return cached.data;
