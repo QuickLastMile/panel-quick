@@ -5,7 +5,7 @@ import { requireRole, getSession } from '@/lib/session';
 import { saveProyectoBaseRow, saveColaboradorBaseRow } from '@/lib/base';
 
 export async function saveProyecto(row: {
-  rowNumber?: number;
+  originalEmail?: string;
   email: string;
   nombre: string;
   proceso: string;
@@ -24,7 +24,7 @@ export async function saveProyecto(row: {
 }
 
 export async function saveColaborador(row: {
-  rowNumber?: number;
+  originalColaboradorData?: string;
   colaboradorData: string;
   cargo: string;
   ext: string;

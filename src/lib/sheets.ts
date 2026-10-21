@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { getColaboradorBaseRows } from './base';
+import { getColaboradorBaseRows, getProyectoBaseRows } from './base';
 
 export type ServiceRow = {
   id: string;
@@ -18,14 +18,12 @@ export type ServiceRow = {
   usuarioCancelacion: string;
   // Igual que tipoAsignador, pero para quien canceló — AGILIZADOR /
   // SUPERVISOR / ADMINISTRATIVO / etc. según BASE, "AGILIZADOR NO
-  // ASIGNADO" si no está en BASE, o vacío si nunca se canceló. No viene
-  // del Sheet (no hay columna para esto ahí) — se calcula acá cruzando
-  // contra BASE, igual que hace la fórmula del Sheet para tipoAsignador.
+  // ASIGNADO" si no está en BASE, o vacío si nunca se canceló.
   tipoCancelacion: string;
   // Igual que nombreAsignador, pero para quien canceló.
   nombreCancelador: string;
-  // "ID-Nombre" de quién asignó el servicio — es la clave con la que la
-  // hoja BASE resuelve GESTOR/CARGO GESTOR/TIPO ASIGNADOR.
+  // "ID-Nombre" de quién asignó el servicio — es la clave con la que BASE
+  // resuelve GESTOR/CARGO GESTOR/TIPO ASIGNADOR.
   usuarioAsignacion: string;
   // Nombre real de quien asignó, tal cual aparece en la data ("ID-Nombre"
   // sin el ID) — a diferencia de `gestor`, nunca se reemplaza por "AGILIZADOR
@@ -52,8 +50,8 @@ export type ServiceRow = {
   // "AAAA-MM-DD HH:MM:SS" — momento real en que el servicio pasó a
   // Asignado (vacío si nunca se asignó, ej. se canceló antes).
   fechaHoraAsignado: string;
-  // AGILIZADOR / COORDINADOR / OTRO — quién hizo la asignación: el propio
-  // gestor, alguien administrativo, u otro (externo o sin asignar).
+  // AGILIZADOR / SUPERVISOR / ADMINISTRATIVO / AGILIZADOR NO ASIGNADO /
+  // DESCARTAR (sin asignador) — quién hizo la asignación, según BASE.
   tipoAsignador: string;
   // Solo la hora (HH:MM:SS) de `fechaHoraAsignado` — "00:00:00" cuando el
   // servicio nunca se asignó (usar junto con fechaHoraAsignado para
@@ -94,7 +92,13 @@ function getPool(): Pool {
     database: process.env.SUPA_DB_NAME || 'postgres',
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 15000,
-    query_timeout: 30000,
+    // public.services ya pasa de 118k filas y esta consulta las trae TODAS
+    // sin filtro de fecha (así puede funcionar "Buscar en todo el
+    // histórico") — eso tarda ~25-30s y antes se cortaba con el timeout de
+    // 30s. Subido a 55s mientras se decide si vale la pena filtrar por
+    // ventana de fechas (ver conversación: no se tocó porque varias
+    // páginas sí dependen de ver histórico completo).
+    query_timeout: 55000,
     max: 5,
     idleTimeoutMillis: 10000,
   });
@@ -110,6 +114,8 @@ function nombreDesdeIdNombre(idNombre: string): string {
   return (dash >= 0 ? s.slice(dash + 1) : s).trim();
 }
 
+const normKey = (v: string): string => v.trim().toLowerCase();
+
 const toNum = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
@@ -120,74 +126,102 @@ const toStr = (v: unknown): string => (v === null || v === undefined ? '' : Stri
 async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
   const db = getPool();
 
-  const [dataRes, syncRes, colaboradorRows] = await Promise.all([
+  const [dataRes, syncRes, colaboradorRows, proyectoRows] = await Promise.all([
     db.query(
-      `SELECT id, proyecto, gestor, cargo_gestor, estado, ciudad, direccion,
+      `SELECT id, estado, ciudad, direccion,
               nombre_trabajador, ident_trabajador, placa, razon_cancelacion,
               desc_cancelacion, usuario_cancelacion, usuario_asignacion,
               dia_solicitud, anio_solicitud, mes_num_solicitud, mes_solicitud,
               fecha_solicitud, hora_servicio, fecha_creacion, hora_creacion,
-              jefatura, servicio, tipo_servicio, valor_declarado, precio_total,
+              servicio, tipo_servicio, valor_declarado, precio_total,
               ganancias, zona, email, descripcion, dias_anticipados_creacion,
-              fecha_hora_asignado, tipo_asignador, hora_asignacion, minutos_asignacion
+              fecha_hora_asignado, hora_asignacion, minutos_asignacion
        FROM public.services`
     ),
     db.query(`SELECT max(updated_at) AS last FROM public.services`),
     getColaboradorBaseRows(),
+    getProyectoBaseRows(),
   ]);
 
   const lastSyncedAt = syncRes.rows[0]?.last ? new Date(syncRes.rows[0].last).toISOString() : null;
 
-  // Mismo cruce que hace la fórmula de TIPO ASIGNADOR en el Sheet, pero
-  // aplicado a quien CANCELÓ (no hay columna para eso en Datos_Actuales).
-  const tipoPorColaborador = new Map(colaboradorRows.map((c) => [c.colaboradorData, c.tipo]));
+  // PROYECTO/JEFATURA/GESTOR/CARGO GESTOR/TIPO ASIGNADOR ya no vienen de
+  // fórmulas de Sheets (VLOOKUP contra la hoja BASE) — se resuelven acá,
+  // en código, cruzando contra BASE (ahora en Supabase: base_proyecto /
+  // base_colaborador). Case-insensitive porque VLOOKUP en Sheets también
+  // lo era, y los mismos usuarios aparecen con mayúsculas distintas entre
+  // filas en el origen (bi_smart).
+  const colaboradorPorClave = new Map(colaboradorRows.map((c) => [normKey(c.colaboradorData), c]));
+  const proyectoPorEmail = new Map(proyectoRows.map((p) => [normKey(p.email), p]));
+
   const tipoCancelacionFor = (usuarioCancelacion: string): string => {
-    if (!usuarioCancelacion) return '';
-    return tipoPorColaborador.get(usuarioCancelacion) || 'AGILIZADOR NO ASIGNADO';
+    if (!usuarioCancelacion.trim()) return '';
+    const c = colaboradorPorClave.get(normKey(usuarioCancelacion));
+    return c?.cargo || 'AGILIZADOR NO ASIGNADO';
   };
+  const gestorFor = (usuarioAsignacion: string): string => {
+    const c = colaboradorPorClave.get(normKey(usuarioAsignacion));
+    return c ? c.colaborador.toUpperCase() : 'AGILIZADOR NO ASIGNADO';
+  };
+  const cargoGestorFor = (usuarioAsignacion: string): string => {
+    const c = colaboradorPorClave.get(normKey(usuarioAsignacion));
+    return c ? `${c.cargo} ${c.ext}`.trim() : '';
+  };
+  const tipoAsignadorFor = (usuarioAsignacion: string): string => {
+    if (!usuarioAsignacion.trim()) return 'DESCARTAR';
+    const c = colaboradorPorClave.get(normKey(usuarioAsignacion));
+    return c?.cargo || 'AGILIZADOR NO ASIGNADO';
+  };
+  const proyectoFor = (email: string): string => proyectoPorEmail.get(normKey(email))?.proceso || 'OTRO';
+  const jefaturaFor = (email: string): string => proyectoPorEmail.get(normKey(email))?.jefatura || 'nn';
 
   const rows: ServiceRow[] = dataRes.rows
-    .map((r) => ({
-      id: toStr(r.id),
-      proyecto: toStr(r.proyecto) || 'SIN PROYECTO',
-      gestor: toStr(r.gestor) || 'SIN GESTOR',
-      cargoGestor: toStr(r.cargo_gestor),
-      estado: toStr(r.estado) || 'Sin estado',
-      ciudad: toStr(r.ciudad) || 'SIN CIUDAD',
-      direccion: toStr(r.direccion),
-      nombreTrabajador: toStr(r.nombre_trabajador).trim(),
-      identTrabajador: toStr(r.ident_trabajador).trim(),
-      placa: toStr(r.placa).trim(),
-      razonCancelacion: toStr(r.razon_cancelacion),
-      descCancelacion: toStr(r.desc_cancelacion),
-      usuarioCancelacion: toStr(r.usuario_cancelacion),
-      tipoCancelacion: tipoCancelacionFor(toStr(r.usuario_cancelacion)),
-      nombreCancelador: nombreDesdeIdNombre(toStr(r.usuario_cancelacion)),
-      usuarioAsignacion: toStr(r.usuario_asignacion),
-      nombreAsignador: nombreDesdeIdNombre(toStr(r.usuario_asignacion)),
-      diaSolicitud: toNum(r.dia_solicitud),
-      anioSolicitud: toNum(r.anio_solicitud),
-      mesNumSolicitud: toNum(r.mes_num_solicitud),
-      mesSolicitud: toStr(r.mes_solicitud),
-      fechaSolicitud: toStr(r.fecha_solicitud),
-      horaServicio: toStr(r.hora_servicio),
-      fechaCreacion: toStr(r.fecha_creacion),
-      horaCreacion: toStr(r.hora_creacion),
-      jefatura: toStr(r.jefatura).trim(),
-      servicio: toStr(r.servicio),
-      tipoServicio: toStr(r.tipo_servicio),
-      valorDeclarado: toNum(r.valor_declarado),
-      precioTotal: toNum(r.precio_total),
-      ganancias: toNum(r.ganancias),
-      zona: toStr(r.zona),
-      email: toStr(r.email),
-      descripcion: toStr(r.descripcion),
-      diasAnticipadosCreacion: toNum(r.dias_anticipados_creacion),
-      fechaHoraAsignado: toStr(r.fecha_hora_asignado),
-      tipoAsignador: toStr(r.tipo_asignador),
-      horaAsignacion: toStr(r.hora_asignacion),
-      minutosAsignacion: toNum(r.minutos_asignacion),
-    }))
+    .map((r) => {
+      const usuarioAsignacion = toStr(r.usuario_asignacion);
+      const usuarioCancelacion = toStr(r.usuario_cancelacion);
+      const email = toStr(r.email);
+      return {
+        id: toStr(r.id),
+        proyecto: proyectoFor(email) || 'SIN PROYECTO',
+        gestor: gestorFor(usuarioAsignacion) || 'SIN GESTOR',
+        cargoGestor: cargoGestorFor(usuarioAsignacion),
+        estado: toStr(r.estado) || 'Sin estado',
+        ciudad: toStr(r.ciudad) || 'SIN CIUDAD',
+        direccion: toStr(r.direccion),
+        nombreTrabajador: toStr(r.nombre_trabajador).trim(),
+        identTrabajador: toStr(r.ident_trabajador).trim(),
+        placa: toStr(r.placa).trim(),
+        razonCancelacion: toStr(r.razon_cancelacion),
+        descCancelacion: toStr(r.desc_cancelacion),
+        usuarioCancelacion,
+        tipoCancelacion: tipoCancelacionFor(usuarioCancelacion),
+        nombreCancelador: nombreDesdeIdNombre(usuarioCancelacion),
+        usuarioAsignacion,
+        nombreAsignador: nombreDesdeIdNombre(usuarioAsignacion),
+        diaSolicitud: toNum(r.dia_solicitud),
+        anioSolicitud: toNum(r.anio_solicitud),
+        mesNumSolicitud: toNum(r.mes_num_solicitud),
+        mesSolicitud: toStr(r.mes_solicitud),
+        fechaSolicitud: toStr(r.fecha_solicitud),
+        horaServicio: toStr(r.hora_servicio),
+        fechaCreacion: toStr(r.fecha_creacion),
+        horaCreacion: toStr(r.hora_creacion),
+        jefatura: jefaturaFor(email),
+        servicio: toStr(r.servicio),
+        tipoServicio: toStr(r.tipo_servicio),
+        valorDeclarado: toNum(r.valor_declarado),
+        precioTotal: toNum(r.precio_total),
+        ganancias: toNum(r.ganancias),
+        zona: toStr(r.zona),
+        email,
+        descripcion: toStr(r.descripcion),
+        diasAnticipadosCreacion: toNum(r.dias_anticipados_creacion),
+        fechaHoraAsignado: toStr(r.fecha_hora_asignado),
+        tipoAsignador: tipoAsignadorFor(usuarioAsignacion),
+        horaAsignacion: toStr(r.hora_asignacion),
+        minutosAsignacion: toNum(r.minutos_asignacion),
+      };
+    })
     .filter((r) => r.id);
 
   return { rows, lastSyncedAt };

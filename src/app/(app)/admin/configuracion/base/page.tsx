@@ -51,8 +51,8 @@ export default async function BaseConfigPage() {
       <div className="mb-5 flex gap-2.5 rounded-lg bg-[var(--accent-soft)] p-3 text-xs text-[var(--accent-bright)]">
         <span>🔗</span>
         <span>
-          Esta es la hoja <b>BASE</b> del Sheet — lo que edites acá se refleja de inmediato en las fórmulas que calculan PROYECTO,
-          JEFATURA, GESTOR, CARGO GESTOR y TIPO ASIGNADOR en Datos_Actuales. Ya no necesitas abrir Google Sheets para mantenerla.
+          Esta es <b>BASE</b> — lo que edites acá se refleja de inmediato en todo lo que se calcula con PROYECTO, JEFATURA,
+          GESTOR, CARGO GESTOR y TIPO ASIGNADOR. Vive en la base de datos, no en Google Sheets.
         </span>
       </div>
 

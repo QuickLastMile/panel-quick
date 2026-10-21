@@ -1,70 +1,54 @@
-import { google } from 'googleapis';
+import { Pool } from 'pg';
 import type { DirectorioEntry } from './directorio-types';
 
 export type { DirectorioEntry } from './directorio-types';
 export { emptyDirectorioEntry } from './directorio-types';
 
-const SHEET_NAME = 'Directorio_Mensajeros';
-
-// A diferencia de sheets.ts (solo lectura), este módulo necesita escribir —
-// usa el mismo service account pero con el scope completo en vez de
-// spreadsheets.readonly.
-function getWriteAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  return new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+let pool: Pool | null = null;
+function getPool(): Pool {
+  if (pool) return pool;
+  const host = process.env.SUPA_DB_HOST;
+  const port = process.env.SUPA_DB_PORT;
+  const user = process.env.SUPA_DB_USER;
+  const password = process.env.SUPA_DB_PASSWORD;
+  if (!host || !port || !user || !password) {
+    throw new Error('Faltan las variables SUPA_DB_* en las variables de entorno.');
+  }
+  pool = new Pool({
+    host,
+    port: Number(port),
+    user,
+    password,
+    database: process.env.SUPA_DB_NAME || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+    query_timeout: 30000,
+    max: 5,
+    idleTimeoutMillis: 10000,
   });
+  return pool;
 }
 
-function getSpreadsheetId() {
-  const id = process.env.MONITOREO_SHEET_ID;
-  if (!id) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
-  return id;
-}
-
-function rowToEntry(r: unknown[]): DirectorioEntry {
-  const s = (i: number) => String(r[i] ?? '').trim();
-  const b = (i: number) => s(i).toUpperCase() === 'TRUE';
+function rowToEntry(r: Record<string, unknown>): DirectorioEntry {
+  const s = (v: unknown) => String(v ?? '').trim();
   return {
-    identTrabajador: s(0),
-    nombreTrabajador: s(1),
-    telefono: s(2),
-    estado: s(3) === 'Inactivo' ? 'Inactivo' : 'Activo',
-    vetado: b(4),
-    vetadoProyecto: s(5),
-    vetadoMotivo: s(6),
-    contratadoFijo: b(7),
-    contratadoFijoProyecto: s(8),
-    notas: s(9),
-    actualizadoEn: s(10),
+    identTrabajador: s(r.ident_trabajador),
+    nombreTrabajador: s(r.nombre_trabajador),
+    telefono: s(r.telefono),
+    estado: s(r.estado) === 'Inactivo' ? 'Inactivo' : 'Activo',
+    vetado: Boolean(r.vetado),
+    vetadoProyecto: s(r.vetado_proyecto),
+    vetadoMotivo: s(r.vetado_motivo),
+    contratadoFijo: Boolean(r.contratado_fijo),
+    contratadoFijoProyecto: s(r.contratado_fijo_proyecto),
+    notas: s(r.notas),
+    actualizadoEn: r.actualizado_en ? new Date(r.actualizado_en as string).toISOString() : '',
   };
 }
 
-function entryToRow(e: DirectorioEntry): (string | boolean)[] {
-  return [
-    e.identTrabajador,
-    e.nombreTrabajador,
-    e.telefono,
-    e.estado,
-    e.vetado ? 'TRUE' : 'FALSE',
-    e.vetadoProyecto,
-    e.vetadoMotivo,
-    e.contratadoFijo ? 'TRUE' : 'FALSE',
-    e.contratadoFijoProyecto,
-    e.notas,
-    new Date().toISOString(),
-  ];
-}
-
 async function fetchDirectorioUncached(): Promise<DirectorioEntry[]> {
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: getSpreadsheetId(),
-    range: `${SHEET_NAME}!A2:K`,
-  });
-  return (res.data.values || []).filter((r) => r[0]).map(rowToEntry);
+  const res = await getPool().query(`select * from public.directorio_mensajeros order by ident_trabajador`);
+  return res.rows.map(rowToEntry);
 }
 
 // Caché corta: a diferencia del snapshot principal, esto se invalida de
@@ -81,33 +65,36 @@ export async function getDirectorio(): Promise<DirectorioEntry[]> {
 }
 
 export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void> {
-  if (!entry.identTrabajador.trim()) throw new Error('Falta la identificación del trabajador.');
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
+  const ident = entry.identTrabajador.trim();
+  if (!ident) throw new Error('Falta la identificación del trabajador.');
 
-  const existing = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${SHEET_NAME}!A:A`,
-  });
-  const ids = (existing.data.values || []).map((r) => String(r[0] ?? '').trim());
-  const rowIdx = ids.indexOf(entry.identTrabajador.trim());
-  const values = [entryToRow(entry)];
-
-  if (rowIdx === -1) {
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `${SHEET_NAME}!A1`,
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values },
-    });
-  } else {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${SHEET_NAME}!A${rowIdx + 1}`,
-      valueInputOption: 'RAW',
-      requestBody: { values },
-    });
-  }
+  await getPool().query(
+    `insert into public.directorio_mensajeros
+       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyecto, vetado_motivo, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+     on conflict (ident_trabajador) do update set
+       nombre_trabajador = excluded.nombre_trabajador,
+       telefono = excluded.telefono,
+       estado = excluded.estado,
+       vetado = excluded.vetado,
+       vetado_proyecto = excluded.vetado_proyecto,
+       vetado_motivo = excluded.vetado_motivo,
+       contratado_fijo = excluded.contratado_fijo,
+       contratado_fijo_proyecto = excluded.contratado_fijo_proyecto,
+       notas = excluded.notas,
+       actualizado_en = now()`,
+    [
+      ident,
+      entry.nombreTrabajador,
+      entry.telefono,
+      entry.estado,
+      entry.vetado,
+      entry.vetadoProyecto,
+      entry.vetadoMotivo,
+      entry.contratadoFijo,
+      entry.contratadoFijoProyecto,
+      entry.notas,
+    ]
+  );
   cached = null;
 }

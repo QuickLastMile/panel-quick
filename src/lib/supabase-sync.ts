@@ -1,19 +1,15 @@
 // Mismo propósito que automation/lib/supabase-sync.mjs — se duplica acá
 // porque el botón "Actualizar ahora" corre en Vercel, no en el PC local.
-// Mantiene public.services (Supabase) al día con los servicios que
-// cambiaron en el Sheet en esta corrida (ya con PROYECTO/GESTOR/etc.
-// resueltos por las fórmulas del Sheet).
-import { google } from 'googleapis';
+// Sube a Supabase (public.services) los servicios leídos directo de
+// bi_smart (lib/bi-db.ts). Ya no pasa por Google Sheets en ningún punto:
+// PROYECTO/GESTOR/CARGO GESTOR/JEFATURA/TIPO ASIGNADOR ya no se guardan
+// acá — se calculan en vivo en lib/sheets.ts cruzando contra BASE
+// (base_proyecto / base_colaborador, también en Supabase).
 import { Pool } from 'pg';
 import { getColaboradorBaseRows, saveColaboradorBaseRow } from './base';
 
-const SHEET_RANGE = 'Datos_Actuales!A:DZ';
-
 const COLS: Record<string, string> = {
   id: 'ID Servicio',
-  proyecto: 'PROYECTO',
-  gestor: 'GESTOR',
-  cargoGestor: 'CARGO GESTOR',
   estado: 'Estado',
   ciudad: 'Ciudad',
   direccion: 'Dirección de Origen',
@@ -32,7 +28,6 @@ const COLS: Record<string, string> = {
   horaServicio: 'HORA DE SERVICIO',
   fechaCreacion: 'FECHA CREACIÓN',
   horaCreacion: 'HORA DE CREACIÓN',
-  jefatura: 'JEFATURA',
   servicio: 'Servicio',
   tipoServicio: 'Tipo de Servicio',
   valorDeclarado: 'Valor Declarado',
@@ -43,33 +38,23 @@ const COLS: Record<string, string> = {
   descripcion: 'Descripcion',
   diasAnticipadosCreacion: 'DÍAS ANTICIPADAS DE CREACIÓN',
   fechaHoraAsignado: 'Fecha Hora Asignado',
-  tipoAsignador: 'TIPO ASIGNADOR',
   horaAsignacion: 'HORA ASIGNACIÓN',
   minutosAsignacion: 'Minutos Tiempo Asignado',
 };
 
 const DB_COLUMNS = [
-  'id', 'proyecto', 'gestor', 'cargo_gestor', 'estado', 'ciudad', 'direccion',
+  'id', 'estado', 'ciudad', 'direccion',
   'nombre_trabajador', 'ident_trabajador', 'placa', 'razon_cancelacion',
   'desc_cancelacion', 'usuario_cancelacion', 'usuario_asignacion',
   'dia_solicitud', 'anio_solicitud', 'mes_num_solicitud', 'mes_solicitud',
   'fecha_solicitud', 'fecha_solicitud_date', 'hora_servicio', 'fecha_creacion',
-  'hora_creacion', 'jefatura', 'servicio', 'tipo_servicio', 'valor_declarado',
+  'hora_creacion', 'servicio', 'tipo_servicio', 'valor_declarado',
   'precio_total', 'ganancias', 'zona', 'email', 'descripcion',
-  'dias_anticipados_creacion', 'fecha_hora_asignado', 'tipo_asignador',
+  'dias_anticipados_creacion', 'fecha_hora_asignado',
   'hora_asignacion', 'minutos_asignacion',
 ] as const;
 
 type DbRow = (string | number | null)[];
-
-function getReadAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  return new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-}
 
 const get = (row: unknown[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
 const getStr = (row: unknown[], i: number) => String(get(row, i) || '').trim();
@@ -81,16 +66,6 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
-// Filas creadas antes de corregir la fórmula del Sheet todavía traen
-// "OTRO" o el error crudo "#N/A (Did not find value...)" grabado en la
-// celda — se normaliza acá en vez de depender de que cada fila individual
-// tenga la fórmula al día (ver mismo fix en automation/lib/supabase-sync.mjs).
-function normalizeTipo(value: string): string {
-  const v = value.trim();
-  if (!v || v === 'OTRO' || v.toUpperCase().startsWith('#N/A')) return 'AGILIZADOR NO ASIGNADO';
-  return v;
-}
-
 function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
   const dia = getNum(row, idx.diaSolicitud);
   const mes = getNum(row, idx.mesNumSolicitud);
@@ -99,9 +74,6 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
 
   return [
     getStr(row, idx.id),
-    getStr(row, idx.proyecto) || null,
-    normalizeTipo(getStr(row, idx.gestor)) || null,
-    getStr(row, idx.cargoGestor) || null,
     getStr(row, idx.estado) || null,
     getStr(row, idx.ciudad) || null,
     getStr(row, idx.direccion) || null,
@@ -121,7 +93,6 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
     getStr(row, idx.horaServicio) || null,
     getStr(row, idx.fechaCreacion) || null,
     getStr(row, idx.horaCreacion) || null,
-    getStr(row, idx.jefatura) || null,
     getStr(row, idx.servicio) || null,
     getStr(row, idx.tipoServicio) || null,
     getNum(row, idx.valorDeclarado),
@@ -132,7 +103,6 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
     getStr(row, idx.descripcion) || null,
     getNum(row, idx.diasAnticipadosCreacion),
     getStr(row, idx.fechaHoraAsignado) || null,
-    normalizeTipo(getStr(row, idx.tipoAsignador)) || null,
     getStr(row, idx.horaAsignacion) || null,
     getNum(row, idx.minutosAsignacion),
   ];
@@ -157,8 +127,8 @@ async function ensureColaboradoresRegistered(idNombreValues: string[]): Promise<
   if (!vistos.length) return;
 
   const existing = await getColaboradorBaseRows();
-  const existingSet = new Set(existing.map((r) => r.colaboradorData));
-  const nuevos = vistos.filter((v) => !existingSet.has(v));
+  const existingSet = new Set(existing.map((r) => r.colaboradorData.toLowerCase()));
+  const nuevos = vistos.filter((v) => !existingSet.has(v.toLowerCase()));
   if (!nuevos.length) return;
 
   for (const idNombre of nuevos) {
@@ -169,49 +139,6 @@ async function ensureColaboradoresRegistered(idNombreValues: string[]): Promise<
       'Automatización'
     );
   }
-}
-
-export async function fetchSheetRowsByIds(ids: string[]): Promise<DbRow[]> {
-  if (!ids.length) return [];
-  const wanted = new Set(ids.map(String));
-
-  const spreadsheetId = process.env.MONITOREO_SHEET_ID;
-  if (!spreadsheetId) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
-
-  const sheets = google.sheets({ version: 'v4', auth: getReadAuth() });
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: SHEET_RANGE,
-    valueRenderOption: 'UNFORMATTED_VALUE',
-    dateTimeRenderOption: 'FORMATTED_STRING',
-  });
-  const values = res.data.values || [];
-  if (values.length < 2) return [];
-
-  const headers = values[0];
-  const idx: Record<string, number> = {};
-  for (const [key, header] of Object.entries(COLS)) {
-    idx[key] = headers.indexOf(header);
-  }
-
-  const matched = values.slice(1).filter((row) => wanted.has(String(row[idx.id])));
-
-  const vistos: string[] = [];
-  for (const row of matched) {
-    const asig = getStr(row, idx.usuarioAsignacion);
-    const cancel = getStr(row, idx.usuarioCancelacion);
-    if (asig) vistos.push(asig);
-    if (cancel) vistos.push(cancel);
-  }
-  if (vistos.length) {
-    try {
-      await ensureColaboradoresRegistered(vistos);
-    } catch (error) {
-      console.log(`Aviso: no se pudo registrar automáticamente en BASE (${(error as Error).message}).`);
-    }
-  }
-
-  return matched.map((row) => toDbRow(row, idx));
 }
 
 let pool: Pool | null = null;
@@ -265,9 +192,36 @@ async function upsertBatch(rows: DbRow[]) {
   await getPool().query(sql, params);
 }
 
-export async function syncIdsToSupabase(ids: string[]): Promise<number> {
-  if (!ids.length) return 0;
-  const rows = await fetchSheetRowsByIds(ids);
+// Punto de entrada: csvRows ya viene de bi_smart (lib/bi-db.ts), formato
+// [headers, ...filas]. Sube TODAS las filas del lote (upsert idempotente,
+// sin diffing) y registra en BASE cualquier asignador/cancelador nuevo.
+export async function upsertCsvRowsToSupabase(csvRows: string[][]): Promise<number> {
+  if (!csvRows || csvRows.length < 2) return 0;
+  const headers = csvRows[0];
+  const idx: Record<string, number> = {};
+  for (const [key, header] of Object.entries(COLS)) {
+    idx[key] = headers.indexOf(header);
+  }
+  if (idx.id < 0) throw new Error('No se encontró la columna "ID Servicio" en los datos de bi_smart.');
+
+  const dataRows = csvRows.slice(1).filter((row) => get(row, idx.id));
+
+  const vistos: string[] = [];
+  for (const row of dataRows) {
+    const asig = getStr(row, idx.usuarioAsignacion);
+    const cancel = getStr(row, idx.usuarioCancelacion);
+    if (asig) vistos.push(asig);
+    if (cancel) vistos.push(cancel);
+  }
+  if (vistos.length) {
+    try {
+      await ensureColaboradoresRegistered(vistos);
+    } catch (error) {
+      console.log(`Aviso: no se pudo registrar automáticamente en BASE (${(error as Error).message}).`);
+    }
+  }
+
+  const rows = dataRows.map((row) => toDbRow(row, idx));
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await upsertBatch(rows.slice(i, i + BATCH_SIZE));
   }

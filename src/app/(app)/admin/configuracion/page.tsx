@@ -1,5 +1,5 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { getConfiguracionRows, getRangoConfig } from '@/lib/configuracion';
+import { getRangoConfig } from '@/lib/configuracion';
 import { requireRole } from '@/lib/session';
 import { formatBogotaDateTime } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
@@ -7,19 +7,15 @@ import ConfigTabs from '@/components/config-tabs';
 import RangoEditor from './rango-editor';
 import RefreshButton from './refresh-button';
 
-// El botón "Actualizar ahora" lee toda la hoja (A:ZZ) para comparar y
-// escribir — con el límite por defecto (10s en plan Hobby) Vercel corta la
+// El botón "Actualizar ahora" consulta bi_smart y sube el resultado a
+// Supabase — con el límite por defecto (10s en plan Hobby) Vercel corta la
 // función a medias y el botón se queda pegado en "Actualizando...".
 export const maxDuration = 60;
-
-// Estas dos viven en su propia fila editable (RangoEditor) — no se
-// duplican en la tabla informativa de abajo.
-const HIDDEN_LABELS = new Set(['Días hacia atrás', 'Días hacia adelante']);
 
 export default async function ConfiguracionPage() {
   const role = await requireRole(['admin']);
   const { rows, lastSyncedAt } = await getSheetsSnapshot();
-  const [configRows, rango] = await Promise.all([getConfiguracionRows(), getRangoConfig()]);
+  const rango = await getRangoConfig();
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
@@ -36,14 +32,6 @@ export default async function ConfiguracionPage() {
         <table className="w-full text-sm">
           <tbody>
             <RangoEditor rango={rango} canEdit={role === 'admin'} />
-            {configRows
-              .filter((r) => !HIDDEN_LABELS.has(r.parametro))
-              .map((r) => (
-                <tr key={r.parametro} className="border-b border-[var(--border)]">
-                  <td className="py-2.5 text-[var(--text-secondary)]">{r.parametro}</td>
-                  <td className="py-2.5 text-right font-semibold text-[var(--text)]">{r.valor}</td>
-                </tr>
-              ))}
             <tr className="border-b border-[var(--border)]">
               <td className="py-2.5 text-[var(--text-secondary)]">Total servicios cargados</td>
               <td className="py-2.5 text-right font-semibold text-[var(--text)]">{rows.length.toLocaleString('es-CO')}</td>
@@ -59,8 +47,7 @@ export default async function ConfiguracionPage() {
           <span>🔒</span>
           <span>
             El <b>rango de descarga</b> ya está conectado en vivo: lo que cambies acá lo lee la automatización en su próxima corrida
-            programada (cada 30 min), directo desde la pestaña <b>Configuracion</b> del Sheet — sin necesidad de tocar código. Los demás
-            parámetros de esta lista son solo informativos por ahora.
+            programada (cada 10 min), directo desde la base de datos — sin necesidad de tocar código ni abrir Google Sheets.
           </span>
         </div>
       </div>

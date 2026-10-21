@@ -103,7 +103,7 @@ function ProyectoForm({
     }
     setSaving(true);
     setError('');
-    const res = await saveProyecto({ rowNumber: initial.rowNumber, email, nombre, proceso, jefatura });
+    const res = await saveProyecto({ originalEmail: initial.email, email, nombre, proceso, jefatura });
     setSaving(false);
     if (res.error) {
       setError(res.error);
@@ -175,7 +175,7 @@ function ColaboradorForm({
     }
     setSaving(true);
     setError('');
-    const res = await saveColaborador({ rowNumber: initial.rowNumber, colaboradorData, cargo, ext, colaborador });
+    const res = await saveColaborador({ originalColaboradorData: initial.colaboradorData, colaboradorData, cargo, ext, colaborador });
     setSaving(false);
     if (res.error) {
       setError(res.error);
@@ -194,7 +194,7 @@ function ColaboradorForm({
           onChange={(e) => setColaboradorData(e.target.value)}
           className={inputCls}
           placeholder="Ej. 455892-Miguel Angel Pirateque Lozano"
-          disabled={!!initial.rowNumber}
+          disabled={!!initial.colaboradorData}
         />
         <p className="mt-1 text-[11px] text-[var(--text-muted)]">
           Tal cual aparece en "Usuario Asignación" — cópialo de la lista de "No especificados" para no equivocarte.
@@ -374,7 +374,7 @@ export default function BaseClient({
                       </tr>
                     ) : (
                       filteredProyectos.map((r) => (
-                        <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                        <tr key={r.email} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                           <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.email}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.nombre}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.proceso}</td>
@@ -454,7 +454,7 @@ export default function BaseClient({
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por colaborador, cargo, tipo…"
+                  placeholder="Buscar por colaborador, cargo…"
                   className="w-72 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
                 />
                 <button
@@ -484,7 +484,7 @@ export default function BaseClient({
                       </tr>
                     ) : (
                       filteredColaboradores.map((r) => (
-                        <tr key={r.rowNumber} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+                        <tr key={r.colaboradorData} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                           <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{r.colaboradorData}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.cargo}</td>
                           <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{r.ext}</td>
@@ -507,12 +507,12 @@ export default function BaseClient({
       )}
 
       {proyectoModal && (
-        <Modal title={proyectoModal.rowNumber ? 'Editar proyecto' : 'Nuevo proyecto'} onClose={() => setProyectoModal(null)}>
+        <Modal title={proyectoModal.email ? 'Editar proyecto' : 'Nuevo proyecto'} onClose={() => setProyectoModal(null)}>
           <ProyectoForm initial={proyectoModal} onClose={() => setProyectoModal(null)} jefaturasExistentes={jefaturasExistentes} />
         </Modal>
       )}
       {colaboradorModal && (
-        <Modal title={colaboradorModal.rowNumber ? 'Editar colaborador' : 'Nuevo colaborador'} onClose={() => setColaboradorModal(null)}>
+        <Modal title={colaboradorModal.colaboradorData ? 'Editar colaborador' : 'Nuevo colaborador'} onClose={() => setColaboradorModal(null)}>
           <ColaboradorForm
             initial={colaboradorModal}
             onClose={() => setColaboradorModal(null)}

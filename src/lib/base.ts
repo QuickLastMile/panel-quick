@@ -1,19 +1,13 @@
-import { google } from 'googleapis';
+import { Pool } from 'pg';
 import { logModificacion } from './modificaciones';
 
-// La hoja BASE es la tabla de referencia que alimenta, por VLOOKUP, las
-// columnas PROYECTO/JEFATURA/GESTOR/CARGO GESTOR/TIPO ASIGNADOR de
-// Datos_Actuales. Son dos bloques independientes pegados uno al lado del
-// otro en la misma hoja:
-//   A:D — Email del solicitante -> Proyecto / Jefatura
-//   F:L — "ID-Nombre" de quién asignó -> Cargo / Colaborador / Tipo
-const SHEET_NAME = 'BASE';
-const PROYECTO_RANGE = `${SHEET_NAME}!A2:D`;
-const COLABORADOR_RANGE = `${SHEET_NAME}!F2:L`;
-
+// BASE es la tabla de referencia que resuelve PROYECTO/JEFATURA/GESTOR/
+// CARGO GESTOR/TIPO ASIGNADOR — antes vivía en una hoja de Google Sheets
+// con fórmulas VLOOKUP; ahora son dos tablas de Supabase (sin Sheets de
+// por medio en ningún punto):
+//   base_proyecto    — Email del solicitante -> Proyecto / Jefatura
+//   base_colaborador — "ID-Nombre" de quién asignó -> Cargo / Colaborador
 export type ProyectoBaseRow = {
-  // Fila 1-based dentro del bloque A:D (para poder editarla luego).
-  rowNumber: number;
   email: string;
   nombre: string;
   proceso: string;
@@ -21,73 +15,72 @@ export type ProyectoBaseRow = {
 };
 
 export type ColaboradorBaseRow = {
-  rowNumber: number;
   // "ID-Nombre" tal como aparece en "Usuario Asignación" — es la clave.
   colaboradorData: string;
   cargo: string;
   ext: string;
   colaborador: string;
+  // CARGO es el único campo de clasificación (ver saveColaboradorBaseRow) —
+  // se expone también como "tipo" porque el resto del código (TIPO
+  // ASIGNADOR/TIPO CANCELACIÓN) ya cruza por ese nombre.
   tipo: string;
 };
 
-function getReadAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  return new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+let pool: Pool | null = null;
+function getPool(): Pool {
+  if (pool) return pool;
+  const host = process.env.SUPA_DB_HOST;
+  const port = process.env.SUPA_DB_PORT;
+  const user = process.env.SUPA_DB_USER;
+  const password = process.env.SUPA_DB_PASSWORD;
+  if (!host || !port || !user || !password) {
+    throw new Error('Faltan las variables SUPA_DB_* en las variables de entorno.');
+  }
+  pool = new Pool({
+    host,
+    port: Number(port),
+    user,
+    password,
+    database: process.env.SUPA_DB_NAME || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+    query_timeout: 30000,
+    max: 5,
+    idleTimeoutMillis: 10000,
   });
-}
-
-function getWriteAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  return new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-}
-
-function getSpreadsheetId() {
-  const id = process.env.MONITOREO_SHEET_ID;
-  if (!id) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
-  return id;
+  return pool;
 }
 
 export async function getProyectoBaseRows(): Promise<ProyectoBaseRow[]> {
-  const sheets = google.sheets({ version: 'v4', auth: getReadAuth() });
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: getSpreadsheetId(), range: PROYECTO_RANGE });
-  const values = res.data.values || [];
-  return values
-    .map((r, i) => ({
-      rowNumber: i + 2,
-      email: String(r[0] || '').trim(),
-      nombre: String(r[1] || '').trim(),
-      proceso: String(r[2] || '').trim(),
-      jefatura: String(r[3] || '').trim(),
-    }))
-    .filter((r) => r.email);
+  const res = await getPool().query(
+    `select email, nombre, proceso, jefatura from public.base_proyecto order by email`
+  );
+  return res.rows.map((r) => ({
+    email: String(r.email || ''),
+    nombre: String(r.nombre || ''),
+    proceso: String(r.proceso || ''),
+    jefatura: String(r.jefatura || ''),
+  }));
 }
 
 export async function getColaboradorBaseRows(): Promise<ColaboradorBaseRow[]> {
-  const sheets = google.sheets({ version: 'v4', auth: getReadAuth() });
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: getSpreadsheetId(), range: COLABORADOR_RANGE });
-  const values = res.data.values || [];
-  return values
-    .map((r, i) => ({
-      rowNumber: i + 2,
-      colaboradorData: String(r[0] || '').trim(),
-      cargo: String(r[1] || '').trim(),
-      ext: String(r[2] || '').trim(),
-      colaborador: String(r[3] || '').trim(),
-      tipo: String(r[6] || '').trim(),
-    }))
-    .filter((r) => r.colaboradorData);
+  const res = await getPool().query(
+    `select colaborador_data, cargo, ext, colaborador from public.base_colaborador order by colaborador_data`
+  );
+  return res.rows.map((r) => ({
+    colaboradorData: String(r.colaborador_data || ''),
+    cargo: String(r.cargo || ''),
+    ext: String(r.ext || ''),
+    colaborador: String(r.colaborador || ''),
+    tipo: String(r.cargo || ''),
+  }));
 }
 
 export async function saveProyectoBaseRow(
   row: {
-    rowNumber?: number;
+    // Email original antes de este guardado — permite "renombrar" el
+    // email (la llave) de una fila existente. Vacío/ausente = fila nueva.
+    originalEmail?: string;
     email: string;
     nombre: string;
     proceso: string;
@@ -97,23 +90,23 @@ export async function saveProyectoBaseRow(
 ): Promise<void> {
   const email = row.email.trim();
   if (!email) throw new Error('El email es obligatorio.');
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-  const values = [[email, row.nombre.trim(), row.proceso.trim(), row.jefatura.trim()]];
+  const nombre = row.nombre.trim();
+  const proceso = row.proceso.trim();
+  const jefatura = row.jefatura.trim();
+  const originalEmail = row.originalEmail?.trim();
 
-  if (row.rowNumber) {
-    const existing = await getProyectoBaseRows();
-    const before = existing.find((r) => r.rowNumber === row.rowNumber);
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${SHEET_NAME}!A${row.rowNumber}:D${row.rowNumber}`,
-      valueInputOption: 'RAW',
-      requestBody: { values },
-    });
+  const pool = getPool();
+
+  if (originalEmail) {
+    const before = (await pool.query(`select nombre, proceso, jefatura from public.base_proyecto where email = $1`, [originalEmail])).rows[0];
+    await pool.query(
+      `update public.base_proyecto set email = $1, nombre = $2, proceso = $3, jefatura = $4 where email = $5`,
+      [email, nombre, proceso, jefatura, originalEmail]
+    );
     const campos: [string, string, string][] = [
-      ['Nombre', before?.nombre || '', row.nombre.trim()],
-      ['Proyecto', before?.proceso || '', row.proceso.trim()],
-      ['Jefatura', before?.jefatura || '', row.jefatura.trim()],
+      ['Nombre', before?.nombre || '', nombre],
+      ['Proyecto', before?.proceso || '', proceso],
+      ['Jefatura', before?.jefatura || '', jefatura],
     ];
     for (const [campo, antes, despues] of campos) {
       if (antes !== despues) {
@@ -123,22 +116,19 @@ export async function saveProyectoBaseRow(
     return;
   }
 
-  // Fila nueva: se agrega siempre dentro del bloque A:D, sin pisar las
-  // demás columnas de la hoja (F en adelante).
-  const existing = await getProyectoBaseRows();
-  const nextRow = (existing.at(-1)?.rowNumber ?? 1) + 1;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${SHEET_NAME}!A${nextRow}:D${nextRow}`,
-    valueInputOption: 'RAW',
-    requestBody: { values },
-  });
-  await logModificacion({ area: 'BASE (Proyecto/Jefatura)', entidad: email, usuario, campo: 'creación', valorNuevo: `${row.nombre.trim()} · ${row.proceso.trim()} · ${row.jefatura.trim()}` });
+  await pool.query(
+    `insert into public.base_proyecto (email, nombre, proceso, jefatura) values ($1,$2,$3,$4)
+     on conflict (email) do update set nombre = excluded.nombre, proceso = excluded.proceso, jefatura = excluded.jefatura`,
+    [email, nombre, proceso, jefatura]
+  );
+  await logModificacion({ area: 'BASE (Proyecto/Jefatura)', entidad: email, usuario, campo: 'creación', valorNuevo: `${nombre} · ${proceso} · ${jefatura}` });
 }
 
 export async function saveColaboradorBaseRow(
   row: {
-    rowNumber?: number;
+    // "ID-Nombre" original antes de este guardado — permite editar la
+    // llave de una fila existente. Vacío/ausente = fila nueva.
+    originalColaboradorData?: string;
     colaboradorData: string;
     cargo: string;
     ext: string;
@@ -151,33 +141,18 @@ export async function saveColaboradorBaseRow(
   const cargo = row.cargo.trim();
   const ext = row.ext.trim();
   const colaborador = row.colaborador.trim();
-  // TIPO (columna L) ya no se captura por separado: según el archivo de
-  // referencia de la usuaria, CARGO es el único campo de clasificación
-  // (AGILIZADOR / SUPERVISOR / VACACIONES / ADMINISTRATIVO / AGILIZADOR NO
-  // ASIGNADO) — tener los dos por separado fue lo que causó que se
-  // desincronizaran para la misma persona. Se escribe siempre igual a
-  // CARGO para que TIPO ASIGNADOR (que se calcula cruzando contra esta
-  // columna) nunca vuelva a divergir.
-  const tipo = cargo;
-  // "conca" y "MAYUS" (columnas J y K) son derivadas — las fórmulas de
-  // Datos_Actuales las leen directo, así que hay que escribirlas también o
-  // el cruce de CARGO GESTOR / GESTOR quedaría en blanco para filas nuevas.
-  const conca = `${cargo} ${ext}`.trim();
-  const mayus = colaborador.toUpperCase();
+  const originalColaboradorData = row.originalColaboradorData?.trim();
 
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-  const values = [[colaboradorData, cargo, ext, colaborador, conca, mayus, tipo]];
+  const pool = getPool();
 
-  if (row.rowNumber) {
-    const existing = await getColaboradorBaseRows();
-    const before = existing.find((r) => r.rowNumber === row.rowNumber);
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${SHEET_NAME}!F${row.rowNumber}:L${row.rowNumber}`,
-      valueInputOption: 'RAW',
-      requestBody: { values },
-    });
+  if (originalColaboradorData) {
+    const before = (
+      await pool.query(`select cargo, ext, colaborador from public.base_colaborador where colaborador_data = $1`, [originalColaboradorData])
+    ).rows[0];
+    await pool.query(
+      `update public.base_colaborador set colaborador_data = $1, cargo = $2, ext = $3, colaborador = $4 where colaborador_data = $5`,
+      [colaboradorData, cargo, ext, colaborador, originalColaboradorData]
+    );
     const campos: [string, string, string][] = [
       ['Cargo', before?.cargo || '', cargo],
       ['Extensión', before?.ext || '', ext],
@@ -191,13 +166,10 @@ export async function saveColaboradorBaseRow(
     return;
   }
 
-  const existing = await getColaboradorBaseRows();
-  const nextRow = (existing.at(-1)?.rowNumber ?? 1) + 1;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${SHEET_NAME}!F${nextRow}:L${nextRow}`,
-    valueInputOption: 'RAW',
-    requestBody: { values },
-  });
-  await logModificacion({ area: 'BASE (Gestor/Cargo)', entidad: colaboradorData, usuario, campo: 'creación', valorNuevo: `${colaborador} · ${cargo} · ${tipo}` });
+  await pool.query(
+    `insert into public.base_colaborador (colaborador_data, cargo, ext, colaborador) values ($1,$2,$3,$4)
+     on conflict (colaborador_data) do update set cargo = excluded.cargo, ext = excluded.ext, colaborador = excluded.colaborador`,
+    [colaboradorData, cargo, ext, colaborador]
+  );
+  await logModificacion({ area: 'BASE (Gestor/Cargo)', entidad: colaboradorData, usuario, campo: 'creación', valorNuevo: `${colaborador} · ${cargo}` });
 }

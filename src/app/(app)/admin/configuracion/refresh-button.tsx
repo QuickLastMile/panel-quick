@@ -20,7 +20,7 @@ export default function RefreshButton() {
         return;
       }
       const r = res.result!;
-      setMessage({ type: 'ok', text: `Listo — ${r.nuevos} nuevos, ${r.actualizados} actualizados (${r.total} servicios revisados).` });
+      setMessage({ type: 'ok', text: `Listo — ${r.total} servicios actualizados.` });
       router.refresh();
     } catch (e) {
       setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Falló la actualización (sin más detalle).' });

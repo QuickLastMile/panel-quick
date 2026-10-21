@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { Pool } from 'pg';
 import type { Role } from './auth';
 import { hashPassword, verifyPassword } from './password';
 import type { Usuario } from './usuarios-types';
@@ -6,26 +6,33 @@ import { logModificacion } from './modificaciones';
 
 export type { Usuario } from './usuarios-types';
 
-const SHEET_NAME = 'Usuarios';
 const VALID_ROLES = new Set<Role>(['admin', 'supervisor', 'coordinador', 'onboarding']);
 
 type UsuarioRow = Usuario & { passwordHash: string };
 
-// Igual que directorio.ts / configuracion.ts: mismo service account, con
-// scope de escritura completo.
-function getWriteAuth() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) throw new Error('Falta GOOGLE_SERVICE_ACCOUNT_JSON en las variables de entorno.');
-  return new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+let pool: Pool | null = null;
+function getPool(): Pool {
+  if (pool) return pool;
+  const host = process.env.SUPA_DB_HOST;
+  const port = process.env.SUPA_DB_PORT;
+  const user = process.env.SUPA_DB_USER;
+  const password = process.env.SUPA_DB_PASSWORD;
+  if (!host || !port || !user || !password) {
+    throw new Error('Faltan las variables SUPA_DB_* en las variables de entorno.');
+  }
+  pool = new Pool({
+    host,
+    port: Number(port),
+    user,
+    password,
+    database: process.env.SUPA_DB_NAME || 'postgres',
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+    query_timeout: 30000,
+    max: 5,
+    idleTimeoutMillis: 10000,
   });
-}
-
-function getSpreadsheetId() {
-  const id = process.env.MONITOREO_SHEET_ID;
-  if (!id) throw new Error('Falta MONITOREO_SHEET_ID en las variables de entorno.');
-  return id;
+  return pool;
 }
 
 function normalizeEmail(email: string): string {
@@ -33,21 +40,17 @@ function normalizeEmail(email: string): string {
 }
 
 async function getAllUsuarios(): Promise<UsuarioRow[]> {
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: getSpreadsheetId(),
-    range: `${SHEET_NAME}!A2:F`,
-  });
-  return (res.data.values || [])
-    .filter((r) => r[0])
-    .map((r) => ({
-      email: normalizeEmail(String(r[0])),
-      nombre: String(r[1] || ''),
-      passwordHash: String(r[2] || ''),
-      rol: (VALID_ROLES.has(String(r[3]) as Role) ? String(r[3]) : 'coordinador') as Role,
-      activo: String(r[4] ?? 'TRUE').toUpperCase() !== 'FALSE',
-      creadoEn: String(r[5] || ''),
-    }));
+  const res = await getPool().query(
+    `select email, nombre, password_hash, rol, activo, creado_en from public.usuarios`
+  );
+  return res.rows.map((r) => ({
+    email: normalizeEmail(String(r.email)),
+    nombre: String(r.nombre || ''),
+    passwordHash: String(r.password_hash || ''),
+    rol: (VALID_ROLES.has(r.rol as Role) ? r.rol : 'coordinador') as Role,
+    activo: Boolean(r.activo),
+    creadoEn: r.creado_en ? new Date(r.creado_en).toISOString() : '',
+  }));
 }
 
 export async function getUsuarios(): Promise<Usuario[]> {
@@ -92,36 +95,17 @@ export async function createUsuario(
     throw new Error('Ya existe un usuario con ese correo.');
   }
 
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${SHEET_NAME}!A1`,
-    valueInputOption: 'RAW',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: {
-      values: [[normalized, nombre.trim(), hashPassword(password), rol, 'TRUE', new Date().toISOString()]],
-    },
-  });
+  await getPool().query(
+    `insert into public.usuarios (email, nombre, password_hash, rol, activo) values ($1,$2,$3,$4,true)`,
+    [normalized, nombre.trim(), hashPassword(password), rol]
+  );
   await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'creación', valorNuevo: `${nombre.trim()} · ${rol}` });
 }
 
 export async function setUsuarioActivo(email: string, activo: boolean, usuarioActor: string): Promise<void> {
   const normalized = normalizeEmail(email);
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_NAME}!A:A` });
-  const col = (res.data.values || []).map((r) => normalizeEmail(String(r[0] ?? '')));
-  const idx = col.indexOf(normalized);
-  if (idx === -1) throw new Error('Usuario no encontrado.');
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${SHEET_NAME}!E${idx + 1}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[activo ? 'TRUE' : 'FALSE']] },
-  });
+  const res = await getPool().query(`update public.usuarios set activo = $1 where email = $2`, [activo, normalized]);
+  if (res.rowCount === 0) throw new Error('Usuario no encontrado.');
   await logModificacion({
     area: 'Usuarios',
     entidad: normalized,
@@ -135,42 +119,19 @@ export async function setUsuarioActivo(email: string, activo: boolean, usuarioAc
 export async function setUsuarioRol(email: string, rol: Role, usuarioActor: string): Promise<void> {
   if (!VALID_ROLES.has(rol)) throw new Error('Rol inválido.');
   const normalized = normalizeEmail(email);
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-
   const existing = await getAllUsuarios();
   const before = existing.find((u) => u.email === normalized);
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_NAME}!A:A` });
-  const col = (res.data.values || []).map((r) => normalizeEmail(String(r[0] ?? '')));
-  const idx = col.indexOf(normalized);
-  if (idx === -1) throw new Error('Usuario no encontrado.');
+  if (!before) throw new Error('Usuario no encontrado.');
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${SHEET_NAME}!D${idx + 1}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[rol]] },
-  });
-  await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'Rol', valorAnterior: before?.rol || '', valorNuevo: rol });
+  await getPool().query(`update public.usuarios set rol = $1 where email = $2`, [rol, normalized]);
+  await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'Rol', valorAnterior: before.rol, valorNuevo: rol });
 }
 
 export async function setUsuarioPassword(email: string, newPassword: string, usuarioActor: string): Promise<void> {
   if (newPassword.length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
   const normalized = normalizeEmail(email);
-  const spreadsheetId = getSpreadsheetId();
-  const sheets = google.sheets({ version: 'v4', auth: getWriteAuth() });
-
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SHEET_NAME}!A:A` });
-  const col = (res.data.values || []).map((r) => normalizeEmail(String(r[0] ?? '')));
-  const idx = col.indexOf(normalized);
-  if (idx === -1) throw new Error('Usuario no encontrado.');
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${SHEET_NAME}!C${idx + 1}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[hashPassword(newPassword)]] },
-  });
+  const res = await getPool().query(`update public.usuarios set password_hash = $1 where email = $2`, [hashPassword(newPassword), normalized]);
+  if (res.rowCount === 0) throw new Error('Usuario no encontrado.');
   // Nunca se guarda la contraseña en el historial, solo que se cambió.
   await logModificacion({ area: 'Usuarios', entidad: normalized, usuario: usuarioActor, campo: 'Contraseña', valorNuevo: 'Se cambió la contraseña' });
 }
