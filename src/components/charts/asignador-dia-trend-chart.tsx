@@ -5,17 +5,16 @@ import MultiTrendLineChart from './multi-trend-line-chart';
 import type { DiaTipoPoint } from '@/lib/aggregate';
 import type { DateFilter } from '@/lib/date-filter';
 
+// Mismas 5 categorías de CARGO que BASE (ver panel-quick/src/lib/base.ts) —
+// todas en mayúscula, tal cual vienen de ahí, sin re-etiquetar.
 const TIPO_COLOR: Record<string, string> = {
   AGILIZADOR: '#f3c94f',
-  COORDINADOR: '#4f9df5',
-  OTRO: '#8a8a8a',
+  ADMINISTRATIVO: '#4f9df5',
+  SUPERVISOR: '#9b6fe0',
+  VACACIONES: '#3ab795',
+  'AGILIZADOR NO ASIGNADO': '#8a8a8a',
 };
-const TIPO_LABEL: Record<string, string> = {
-  AGILIZADOR: 'Agilizador',
-  COORDINADOR: 'Administrativo',
-  OTRO: 'Otro / externo',
-};
-const TIPO_ORDER = ['AGILIZADOR', 'COORDINADOR', 'OTRO'];
+const TIPO_ORDER = ['AGILIZADOR', 'ADMINISTRATIVO', 'SUPERVISOR', 'VACACIONES', 'AGILIZADOR NO ASIGNADO'];
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
@@ -66,7 +65,7 @@ export default function AsignadorDiaTrendChart({ diaTipo, pageFilter }: { diaTip
       });
       return {
         key: tipo,
-        label: TIPO_LABEL[tipo] || tipo,
+        label: tipo,
         color: TIPO_COLOR[tipo] || '#8a8a8a',
         points: fechaKeys.map((f) => ({ label: fechas.get(f) || f, value: byFecha[f] || 0 })),
       };
@@ -89,10 +88,10 @@ export default function AsignadorDiaTrendChart({ diaTipo, pageFilter }: { diaTip
             onChange={(e) => setTipoFiltro(e.target.value)}
             className="rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
           >
-            <option value="">Todos (Agilizador/Admin./Otro)</option>
+            <option value="">Todos los tipos</option>
             {TIPO_ORDER.map((t) => (
               <option key={t} value={t}>
-                {TIPO_LABEL[t]}
+                {t}
               </option>
             ))}
           </select>

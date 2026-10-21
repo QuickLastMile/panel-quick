@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { Plus, X, AlertTriangle, History, ShieldOff, ShieldCheck, MessageSquarePlus, Copy, ExternalLink, Check } from 'lucide-react';
+import { Plus, X, AlertTriangle, History, ShieldOff, ShieldCheck, MessageSquarePlus, Copy, ExternalLink, Check, Phone } from 'lucide-react';
 import type { ColaboradorRow, ColaboradorInput, ColaboradorHistorialEntry } from '@/lib/colaboradores';
 import { TIPOS_IDENTIFICACION, TIPOS_VEHICULO, MEDIOS_VINCULACION, CIUDADES_COLOMBIA } from '@/lib/colaboradores-constants';
 import type { ServiceRow } from '@/lib/sheets';
@@ -23,6 +23,15 @@ const inputCls =
 const labelCls = 'mb-1 block text-xs font-semibold text-[var(--text-secondary)]';
 const ALERT_DIAS = 5;
 const up = (s: string) => s.toUpperCase();
+
+// Celulares colombianos se guardan a 10 dígitos sin indicativo — wa.me
+// necesita el indicativo de país (57) pegado adelante.
+function whatsappLink(telefono: string): string | null {
+  const digits = telefono.replace(/\D/g, '');
+  if (!digits) return null;
+  const withCountryCode = digits.startsWith('57') ? digits : `57${digits}`;
+  return `https://wa.me/${withCountryCode}`;
+}
 
 const REGISTRO_PUBLICO_PATH = '/registro-colaborador';
 
@@ -644,7 +653,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
           <table className="w-full min-w-[1100px] text-sm">
             <thead>
               <tr>
-                {['Nombre', 'Identificación', 'Ciudad', 'Vehículo', 'Agilizador', 'Finalizados', 'No efectivo', 'Último servicio', 'Días sin servicio', estadoTab === 'inactivo' ? 'Motivo' : '', ''].map((h) => (
+                {['Nombre', 'Identificación', 'Ciudad', 'Teléfono', 'Vehículo', 'Agilizador', 'Finalizados', 'No efectivo', 'Último servicio', 'Días sin servicio', estadoTab === 'inactivo' ? 'Motivo' : '', ''].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
                     {h}
                   </th>
@@ -654,7 +663,7 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
+                  <td colSpan={11} className="px-4 py-10 text-center text-[var(--text-muted)]">Sin resultados.</td>
                 </tr>
               ) : (
                 filtered.map((r) => (
@@ -673,6 +682,22 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)]">{r.identificacion}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)]">{r.ciudad}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      {whatsappLink(r.telefono) ? (
+                        <a
+                          href={whatsappLink(r.telefono)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] transition-colors hover:text-emerald-400"
+                          title="Abrir en WhatsApp"
+                        >
+                          <Phone size={13} className="flex-none" />
+                          {r.telefono}
+                        </a>
+                      ) : (
+                        <span className="text-[var(--text-secondary)]">—</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)]">{r.tipoVehiculo}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)]">{r.agilizador || '—'}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)] tabular-nums">{r.cantFinalizados}</td>

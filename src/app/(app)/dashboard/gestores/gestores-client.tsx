@@ -17,15 +17,24 @@ import GestorDetailPanel from '@/components/gestor-detail-panel';
 
 const EN_PROCESO_COLOR = STATUS_COLOR['Asignado'];
 
+// Mismas 5 categorías de CARGO que BASE (ver panel-quick/src/lib/base.ts) —
+// todas en mayúscula, tal cual vienen de ahí, sin re-etiquetar (antes
+// "Agilizador" salía en minúscula/mixto mientras el resto quedaba en
+// mayúscula, por tener solo esta categoría mapeada a una label distinta).
 const TIPO_ASIGNADOR_LABEL: Record<string, string> = {
-  AGILIZADOR: 'Agilizador',
-  COORDINADOR: 'Administrativo (Coordinador)',
-  OTRO: 'Otro / externo',
+  AGILIZADOR: 'AGILIZADOR',
+  ADMINISTRATIVO: 'ADMINISTRATIVO',
+  SUPERVISOR: 'SUPERVISOR',
+  VACACIONES: 'VACACIONES',
+  'AGILIZADOR NO ASIGNADO': 'AGILIZADOR NO ASIGNADO',
 };
 
 const TIPO_ASIGNADOR_COLOR: Record<string, string> = {
   AGILIZADOR: '#f3c94f',
-  COORDINADOR: '#4f9df5',
+  ADMINISTRATIVO: '#4f9df5',
+  SUPERVISOR: '#9b6fe0',
+  VACACIONES: '#3ab795',
+  'AGILIZADOR NO ASIGNADO': '#8a8a8a',
 };
 
 // Formato militar HH:MM:SS para cualquier duración/tiempo promedio — se
@@ -70,13 +79,13 @@ export default function GestoresClient({
   const asignadorPorTipo = useMemo(() => {
     const byKey = Object.fromEntries(porTipoAsignador.map((t) => [t.key, t.count]));
     const agilizador = byKey['AGILIZADOR'] || 0;
-    const coordinador = byKey['COORDINADOR'] || 0;
-    const base = agilizador + coordinador;
+    const administrativo = byKey['ADMINISTRATIVO'] || 0;
+    const base = agilizador + administrativo;
     return {
       agilizador,
-      coordinador,
+      administrativo,
       pctAgilizador: base ? Math.round((agilizador / base) * 1000) / 10 : 0,
-      pctCoordinador: base ? Math.round((coordinador / base) * 1000) / 10 : 0,
+      pctAdministrativo: base ? Math.round((administrativo / base) * 1000) / 10 : 0,
     };
   }, [porTipoAsignador]);
 
@@ -142,7 +151,7 @@ export default function GestoresClient({
   // Series "Agilizador" / "Administrativo" por hora (0-23), recortando las
   // horas sin NINGÚN dato (en ninguna de las dos series) al inicio/fin.
   const horaAsignacionSeries = useMemo(() => {
-    const TIPOS = ['AGILIZADOR', 'COORDINADOR'];
+    const TIPOS = ['AGILIZADOR', 'ADMINISTRATIVO'];
     const scoped = fAsignadorFranja ? porHoraAsignacion.filter((p) => p.gestor === fAsignadorFranja) : porHoraAsignacion;
     const byTipoHora: Record<string, number> = {};
     scoped.forEach((p) => {
@@ -226,7 +235,7 @@ export default function GestoresClient({
           sub="Desde asignación hasta la hora del servicio"
         />
         <StatCard label="Asignado por agiliz." value={`${asignadorPorTipo.pctAgilizador}%`} icon={Percent} iconColor="#f3c94f" sub={`${asignadorPorTipo.agilizador.toLocaleString('es-CO')} servicios`} />
-        <StatCard label="Asignado por admin." value={`${asignadorPorTipo.pctCoordinador}%`} icon={Percent} iconColor="#4f9df5" sub={`${asignadorPorTipo.coordinador.toLocaleString('es-CO')} servicios`} />
+        <StatCard label="Asignado por admin." value={`${asignadorPorTipo.pctAdministrativo}%`} icon={Percent} iconColor="#4f9df5" sub={`${asignadorPorTipo.administrativo.toLocaleString('es-CO')} servicios`} />
         <StatCard label="Efectividad" value={`${efectividad}%`} icon={CheckCircle2} iconColor={STATUS_COLOR['Finalizado']} sub="Asignado + En tránsito + Finalizado / total" />
       </div>
 
