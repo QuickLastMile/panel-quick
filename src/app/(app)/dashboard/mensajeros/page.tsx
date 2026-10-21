@@ -1,11 +1,20 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { buildMensajeroStats, listJefaturas, filterRowsByJefatura, listProyectos, filterRowsByProyecto, isSinClasificar } from '@/lib/aggregate';
+import {
+  buildMensajeroStats,
+  listJefaturas,
+  filterRowsByJefatura,
+  listProyectos,
+  filterRowsByProyecto,
+  parseProyectoParam,
+  isSinClasificar,
+} from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, formatBogotaDateTime } from '@/lib/date-filter';
 import { getDirectorio } from '@/lib/directorio';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
 import JefaturaTabs from '@/components/jefatura-tabs';
+import ProyectoFilter from '@/components/proyecto-filter';
 import MensajerosClient from './mensajeros-client';
 
 // Ver dashboard/page.tsx: getSheetsSnapshot() puede tardar 25-30s con la
@@ -27,7 +36,7 @@ export default async function MensajerosPage({
   const spConFiltroDefault = sp.mode ? sp : { ...sp, mode: 'month' };
   const filter = parseDateFilterParams(spConFiltroDefault);
   const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
-  const proyectoParam = typeof sp.proyecto === 'string' ? sp.proyecto : '';
+  const proyectoParam = parseProyectoParam(sp);
 
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const cleanRows = allRows.filter((r) => !isSinClasificar(r.proyecto));
@@ -51,9 +60,10 @@ export default async function MensajerosPage({
       />
 
       <JefaturaTabs jefaturas={jefaturas} selected={jefaturaParam} />
+      <ProyectoFilter proyectos={proyectos} selected={proyectoParam} />
       <DateFilterBar filter={filter} />
 
-      <MensajerosClient stats={stats} proyectos={proyectos} proyectoParam={proyectoParam} directorio={directorio} />
+      <MensajerosClient stats={stats} directorio={directorio} />
     </div>
   );
 }

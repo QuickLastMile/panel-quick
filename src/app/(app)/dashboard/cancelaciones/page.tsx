@@ -1,7 +1,7 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getMotivosCancelacionConfig } from '@/lib/motivos-cancelacion';
 import { buildCancelacionData, buildPorDiaDelMes } from '@/lib/cancelacion-aggregate';
-import { listJefaturas, filterRowsByJefatura, listProyectos, filterRowsByProyecto } from '@/lib/aggregate';
+import { listJefaturas, filterRowsByJefatura, listProyectos, filterRowsByProyecto, parseProyectoParam } from '@/lib/aggregate';
 import { requireRole } from '@/lib/session';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
@@ -27,7 +27,7 @@ export default async function CancelacionesPage({
   // rezago de un día.
   const filter = parseDateFilterParams(sp);
   const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
-  const proyectoParam = typeof sp.proyecto === 'string' ? sp.proyecto : '';
+  const proyectoParam = parseProyectoParam(sp);
 
   const [{ rows: allRows, lastSyncedAt }, motivosConfig] = await Promise.all([getSheetsSnapshot(), getMotivosCancelacionConfig()]);
 

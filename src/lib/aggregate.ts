@@ -145,9 +145,19 @@ export function listProyectos(rows: ServiceRow[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-export function filterRowsByProyecto(rows: ServiceRow[], proyecto: string): ServiceRow[] {
-  if (!proyecto) return rows;
-  return rows.filter((r) => r.proyecto === proyecto);
+// `proyectos` vacío = sin filtro (todos). Selección múltiple: cualquier
+// fila cuyo proyecto esté en la lista pasa.
+export function filterRowsByProyecto(rows: ServiceRow[], proyectos: string[]): ServiceRow[] {
+  if (!proyectos.length) return rows;
+  const set = new Set(proyectos);
+  return rows.filter((r) => set.has(r.proyecto));
+}
+
+// El filtro de proyecto (selección múltiple) viaja en la URL como
+// "?proyecto=A,B,C" — un único param separado por comas, no uno repetido.
+export function parseProyectoParam(sp: Record<string, string | string[] | undefined>): string[] {
+  const raw = typeof sp.proyecto === 'string' ? sp.proyecto : '';
+  return raw ? raw.split(',').filter(Boolean) : [];
 }
 
 export type MesProyectoPoint = { mes: string; mesLabel: string; proyecto: string; count: number };

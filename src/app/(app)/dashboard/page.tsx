@@ -8,6 +8,7 @@ import {
   filterRowsByJefatura,
   listProyectos,
   filterRowsByProyecto,
+  parseProyectoParam,
   findDobleAsignacion,
 } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
@@ -49,7 +50,7 @@ export default async function ResumenPage({
   const sp = await searchParams;
   const filter = parseDateFilterParams(sp);
   const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
-  const proyectoParam = typeof sp.proyecto === 'string' ? sp.proyecto : '';
+  const proyectoParam = parseProyectoParam(sp);
 
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const jefaturas = listJefaturas(allRows);

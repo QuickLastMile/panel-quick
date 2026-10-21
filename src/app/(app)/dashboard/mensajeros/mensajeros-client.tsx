@@ -1,67 +1,31 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Flag } from 'lucide-react';
+import { Flag, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MensajeroStat } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import type { DirectorioEntry } from '@/lib/directorio-types';
 import MensajeroDetailPanel, { type MensajeroDetailTarget } from '@/components/mensajero-detail-panel';
 
-export default function MensajerosClient({
-  stats,
-  proyectos,
-  proyectoParam,
-  directorio,
-}: {
-  stats: MensajeroStat[];
-  proyectos: string[];
-  proyectoParam: string;
-  directorio: DirectorioEntry[];
-}) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+const PAGE_SIZE = 50;
+
+export default function MensajerosClient({ stats, directorio }: { stats: MensajeroStat[]; directorio: DirectorioEntry[] }) {
   const [selected, setSelected] = useState<MensajeroDetailTarget | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const dirMap = useMemo(() => new Map(directorio.map((d) => [d.identTrabajador, d])), [directorio]);
 
   // Ordenado por cantidad de entregas (finalizados) — lo que pidió el
   // gerente, no por el índice de fidelidad (constancia + cumplimiento).
   const ordenados = useMemo(() => [...stats].sort((a, b) => b.finalizado - a.finalizado), [stats]);
-
-  function setProyecto(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set('proyecto', value);
-    else params.delete('proyecto');
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  // Con el filtro en "todos los proyectos" esto puede pasar de 400 filas —
+  // renderizar la tabla completa en cada cambio de filtro se sentía lento.
+  // Por defecto se muestran las primeras 50 (ya es el ranking ordenado, lo
+  // que más importa está arriba) con un botón para ver el resto.
+  const visibles = showAll ? ordenados : ordenados.slice(0, PAGE_SIZE);
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-end gap-2.5">
-        <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Proyecto</span>
-          <select
-            value={proyectoParam}
-            onChange={(e) => setProyecto(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]"
-          >
-            <option value="">Todos</option>
-            {proyectos.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        {proyectoParam && (
-          <button onClick={() => setProyecto('')} className="text-xs font-semibold text-[var(--accent-bright)] hover:underline">
-            Limpiar filtro
-          </button>
-        )}
-      </div>
-
       {ordenados.length ? (
         <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
           <table className="w-full min-w-[920px] border-collapse text-xs">
@@ -88,7 +52,7 @@ export default function MensajerosClient({
               </tr>
             </thead>
             <tbody>
-              {ordenados.map((s, i) => {
+              {visibles.map((s, i) => {
                 const dirEntry = dirMap.get(s.identTrabajador);
                 return (
                   <tr
@@ -136,6 +100,16 @@ export default function MensajerosClient({
         </div>
       ) : (
         <p className="py-10 text-center text-sm text-[var(--text-muted)]">Sin mensajeros asignados para este filtro.</p>
+      )}
+
+      {ordenados.length > PAGE_SIZE && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--accent-bright)]"
+        >
+          {showAll ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {showAll ? 'Ver menos' : `Ver los ${ordenados.length.toLocaleString('es-CO')} mensajeros`}
+        </button>
       )}
 
       <MensajeroDetailPanel target={selected} onClose={() => setSelected(null)} />
