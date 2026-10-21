@@ -359,11 +359,12 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     }
   > = {};
   rows.forEach((r) => {
-    // Sin asignador registrado = nadie gestionó esto todavía (ej. "En
-    // Espera") — no cuenta para NINGÚN gestor, ni siquiera como relleno
-    // genérico, porque literalmente no hubo ninguna gestión de asignación.
-    if (!r.usuarioAsignacion.trim()) return;
     const g = r.gestor || 'SIN GESTOR';
+    // Sin nombre real posible — ni porque nunca se asignó (ej. "En Espera")
+    // ni porque el asignador no hizo match en BASE — no cuenta para NINGÚN
+    // gestor, ni siquiera como relleno genérico: si no hay nombre, no se
+    // cuenta esa información.
+    if (g.trim().toUpperCase() === 'AGILIZADOR NO ASIGNADO') return;
     if (SIN_CLASIFICAR.has(g.toUpperCase())) return;
     if (!porGestor[g]) {
       porGestor[g] = {
