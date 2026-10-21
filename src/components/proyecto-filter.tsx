@@ -21,18 +21,29 @@ export default function ProyectoFilter({ proyectos, selected }: { proyectos: str
 
   if (!proyectos.length) return null;
 
+  // `selected` vacío (sin param en la URL) = predeterminado "todos
+  // seleccionados" — se muestra así (checkboxes marcados), no como "ninguno".
+  const effectiveSelected = selected.length === 0 ? proyectos : selected;
+  const allSelected = effectiveSelected.length === proyectos.length;
+
   function apply(next: string[]) {
     const params = new URLSearchParams(searchParams.toString());
-    if (next.length) params.set('proyecto', next.join(','));
+    // Si queda todo marcado, se limpia el param — mismo estado implícito
+    // "todos" con el que arranca la página, URL más corta.
+    if (next.length && next.length < proyectos.length) params.set('proyecto', next.join(','));
     else params.delete('proyecto');
     router.push(`${pathname}?${params.toString()}`);
   }
 
   function toggle(p: string) {
-    apply(selected.includes(p) ? selected.filter((x) => x !== p) : [...selected, p]);
+    apply(effectiveSelected.includes(p) ? effectiveSelected.filter((x) => x !== p) : [...effectiveSelected, p]);
   }
 
-  const label = selected.length === 0 ? 'Todos los proyectos' : selected.length === 1 ? selected[0] : `${selected.length} proyectos`;
+  const label = allSelected
+    ? 'Todos los proyectos'
+    : effectiveSelected.length === 1
+      ? effectiveSelected[0]
+      : `${effectiveSelected.length} proyectos`;
 
   return (
     <div ref={ref} className="relative mb-5 inline-block">
@@ -48,11 +59,11 @@ export default function ProyectoFilter({ proyectos, selected }: { proyectos: str
         <div className="absolute z-20 mt-1.5 max-h-80 w-72 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-xl">
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-              {selected.length} seleccionado{selected.length === 1 ? '' : 's'}
+              {effectiveSelected.length} seleccionado{effectiveSelected.length === 1 ? '' : 's'}
             </span>
-            {selected.length > 0 && (
+            {!allSelected && (
               <button onClick={() => apply([])} className="text-[11px] font-semibold text-[var(--accent-bright)] hover:underline">
-                Limpiar
+                Seleccionar todos
               </button>
             )}
           </div>
@@ -63,7 +74,7 @@ export default function ProyectoFilter({ proyectos, selected }: { proyectos: str
             >
               <input
                 type="checkbox"
-                checked={selected.includes(p)}
+                checked={effectiveSelected.includes(p)}
                 onChange={() => toggle(p)}
                 className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
