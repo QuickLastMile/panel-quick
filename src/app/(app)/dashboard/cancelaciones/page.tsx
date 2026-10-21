@@ -1,6 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getMotivosCancelacionConfig } from '@/lib/motivos-cancelacion';
-import { buildCancelacionData } from '@/lib/cancelacion-aggregate';
+import { buildCancelacionData, buildPorDiaDelMes } from '@/lib/cancelacion-aggregate';
 import { listJefaturas, filterRowsByJefatura, listProyectos, filterRowsByProyecto } from '@/lib/aggregate';
 import { requireRole } from '@/lib/session';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, isToday, formatBogotaDateTime } from '@/lib/date-filter';
@@ -36,9 +36,14 @@ export default async function CancelacionesPage({
 
   const scopedRows = filterRowsByProyecto(filterRowsByJefatura(allRows, jefaturaParam), proyectoParam);
   const rows = filterRowsByDate(scopedRows, filter);
+  // "Venta perdida por día" ignora el día/rango exacto a propósito — un
+  // solo día daría una sola barra. Siempre muestra el MES del filtro
+  // actual (jefatura/proyecto sí aplican).
+  const mesRows = filterRowsByDate(scopedRows, { mode: 'month', year: filter.year, month: filter.month, day: 1 });
 
   const motivosCuentan = new Set(motivosConfig.filter((m) => m.cuentaEnPerdida).map((m) => m.motivo));
   const data = buildCancelacionData(rows, motivosCuentan);
+  const porDiaMes = buildPorDiaDelMes(mesRows, motivosCuentan);
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
   return (
@@ -54,7 +59,7 @@ export default async function CancelacionesPage({
       <ProyectoFilter proyectos={proyectos} selected={proyectoParam} />
       <DateFilterBar filter={filter} />
 
-      <CancelacionesClient data={data} />
+      <CancelacionesClient data={data} porDiaMes={porDiaMes} />
     </div>
   );
 }

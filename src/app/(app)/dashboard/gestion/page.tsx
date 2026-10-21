@@ -25,7 +25,7 @@ export default async function GestionPage({
   return (
     <div>
       <PageHeader
-        eyebrow="Gestión"
+        eyebrow="Estado Gestión"
         title="Operación por"
         accent={`estado — ${isToday(filter) ? 'hoy' : formatDateFilterLabel(filter)}`}
         asOf={`Última sincronización: ${syncLabel}`}

@@ -10,7 +10,7 @@ import { ROLE_LABEL } from '@/lib/auth';
 
 const NAV = [
   { href: '/dashboard', label: 'Reporte general', icon: Gauge, roles: ['admin', 'supervisor'] },
-  { href: '/dashboard/gestion', label: 'Gestión', icon: ClipboardList, roles: ['admin', 'supervisor', 'coordinador'] },
+  { href: '/dashboard/gestion', label: 'Estado Gestión', icon: ClipboardList, roles: ['admin', 'supervisor', 'coordinador'] },
   { href: '/dashboard/gestores', label: 'Seguimiento gestores', icon: Users, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/cancelaciones', label: 'Cancelación', icon: XCircle, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/onboarding', label: 'Onboarding', icon: UserPlus, roles: ['admin', 'supervisor', 'onboarding'] },
