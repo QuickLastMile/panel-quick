@@ -518,6 +518,11 @@ export type MensajeroStat = {
   // "quién ha sido constante y confiable".
   diasActivos: number;
   proyectos: string[];
+  // Proyecto donde más servicios ha prestado (moda) — vacío si no tuvo
+  // ningún proyecto clasificado en el rango filtrado.
+  proyectoTop: string;
+  // Tipo de vehículo más frecuente (moda) — ver tipoVehiculoFor en sheets.ts.
+  tipoVehiculo: string;
   // finalizado / (finalizado + cancelado) — 0.5 (neutral) si aún no tiene
   // ningún servicio resuelto, para no castigar a alguien recién llegado.
   tasaCumplimiento: number;
@@ -525,6 +530,21 @@ export type MensajeroStat = {
   // grupo filtrado) + 50% cumplimiento. Es la métrica de "fiel y juicioso".
   indiceFidelidad: number;
 };
+
+// Devuelve la clave con más ocurrencias de un Map<string, number> — "" si
+// el map está vacío. Empate: se queda con la primera vista (orden de
+// inserción), suficiente acá porque no es una métrica crítica.
+function moda(counts: Map<string, number>): string {
+  let best = '';
+  let bestCount = 0;
+  for (const [k, v] of counts) {
+    if (v > bestCount) {
+      best = k;
+      bestCount = v;
+    }
+  }
+  return best;
+}
 
 // Productividad Y fidelidad de mensajeros/trabajadores (no gestores). Usa
 // Ident. Trabajador como llave (el nombre puede repetirse).
@@ -538,6 +558,8 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
     enProceso: number;
     dias: Set<string>;
     proyectos: Set<string>;
+    proyectoCounts: Map<string, number>;
+    vehiculoCounts: Map<string, number>;
   };
   const map: Record<string, Acc> = {};
   rows.forEach((r) => {
@@ -552,6 +574,8 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
         enProceso: 0,
         dias: new Set(),
         proyectos: new Set(),
+        proyectoCounts: new Map(),
+        vehiculoCounts: new Map(),
       };
     }
     const entry = map[r.identTrabajador];
@@ -562,7 +586,11 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
     else if (e === 'Cancelado') entry.cancelado += 1;
     else entry.enProceso += 1;
     if (r.fechaSolicitud) entry.dias.add(r.fechaSolicitud);
-    if (r.proyecto) entry.proyectos.add(r.proyecto);
+    if (r.proyecto) {
+      entry.proyectos.add(r.proyecto);
+      entry.proyectoCounts.set(r.proyecto, (entry.proyectoCounts.get(r.proyecto) || 0) + 1);
+    }
+    if (r.tipoVehiculo) entry.vehiculoCounts.set(r.tipoVehiculo, (entry.vehiculoCounts.get(r.tipoVehiculo) || 0) + 1);
   });
 
   const accs = Object.values(map);
@@ -582,6 +610,8 @@ export function buildMensajeroStats(rows: ServiceRow[]): MensajeroStat[] {
         enProceso: a.enProceso,
         diasActivos: a.dias.size,
         proyectos: Array.from(a.proyectos).sort((x, y) => x.localeCompare(y, 'es')),
+        proyectoTop: moda(a.proyectoCounts),
+        tipoVehiculo: moda(a.vehiculoCounts),
         tasaCumplimiento,
         indiceFidelidad: Math.round(100 * (0.5 * tenureScore + 0.5 * tasaCumplimiento)),
       };

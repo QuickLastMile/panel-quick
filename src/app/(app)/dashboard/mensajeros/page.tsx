@@ -1,9 +1,11 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
-import { isSinClasificar, buildMensajeroStats } from '@/lib/aggregate';
-import { formatBogotaDateTime } from '@/lib/date-filter';
+import { buildMensajeroStats, listJefaturas, filterRowsByJefatura, listProyectos, filterRowsByProyecto, isSinClasificar } from '@/lib/aggregate';
+import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, formatBogotaDateTime } from '@/lib/date-filter';
 import { getDirectorio } from '@/lib/directorio';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
+import DateFilterBar from '@/components/date-filter';
+import JefaturaTabs from '@/components/jefatura-tabs';
 import MensajerosClient from './mensajeros-client';
 
 // Ver dashboard/page.tsx: getSheetsSnapshot() puede tardar 25-30s con la
@@ -15,8 +17,16 @@ export default async function MensajerosPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const role = await requireRole(['admin', 'supervisor']);
+  await requireRole(['admin', 'supervisor']);
   const sp = await searchParams;
+
+  // Esta página arranca en modo "mes actual" (a diferencia del resto del
+  // panel, que arranca en "día actual") — el gerente quiere ver el
+  // acumulado del mes, no un solo día, al entrar. Si la URL ya trae `mode`
+  // (el usuario cambió el filtro), se respeta eso.
+  const spConFiltroDefault = sp.mode ? sp : { ...sp, mode: 'month' };
+  const filter = parseDateFilterParams(spConFiltroDefault);
+  const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
   const proyectoParam = typeof sp.proyecto === 'string' ? sp.proyecto : '';
 
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
@@ -24,13 +34,11 @@ export default async function MensajerosPage({
   const directorio = await getDirectorio();
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
-  // El cálculo en sí es barato (milisegundos para todo el histórico) — lo
-  // caro era mandar las 28k+ filas crudas al navegador solo para que el
-  // cliente las filtrara. Acá se filtra y se agrega en el servidor, y solo
-  // viaja el resultado (un puñado de mensajeros), igual que el filtro de
-  // proyecto se resuelve por URL en vez de estado local.
-  const proyectos = Array.from(new Set(cleanRows.map((r) => r.proyecto).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'));
-  const filteredRows = proyectoParam ? cleanRows.filter((r) => r.proyecto === proyectoParam) : cleanRows;
+  const jefaturas = listJefaturas(cleanRows);
+  const proyectos = listProyectos(cleanRows);
+
+  const scopedRows = filterRowsByProyecto(filterRowsByJefatura(cleanRows, jefaturaParam), proyectoParam);
+  const filteredRows = filterRowsByDate(scopedRows, filter);
   const stats = buildMensajeroStats(filteredRows);
 
   return (
@@ -38,16 +46,14 @@ export default async function MensajerosPage({
       <PageHeader
         eyebrow="Mensajeros"
         title="Ranking de"
-        accent="mensajeros — histórico completo"
+        accent={`mensajeros — ${formatDateFilterLabel(filter)}`}
         asOf={`Última sincronización: ${syncLabel}`}
       />
-      <MensajerosClient
-        stats={stats}
-        proyectos={proyectos}
-        proyectoParam={proyectoParam}
-        directorio={directorio}
-        canEditDirectorio={role === 'admin'}
-      />
+
+      <JefaturaTabs jefaturas={jefaturas} selected={jefaturaParam} />
+      <DateFilterBar filter={filter} />
+
+      <MensajerosClient stats={stats} proyectos={proyectos} proyectoParam={proyectoParam} directorio={directorio} />
     </div>
   );
 }
