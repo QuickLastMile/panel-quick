@@ -215,14 +215,12 @@ export default function GestoresClient({
       .sort((a, b) => a.count - b.count);
   }, [filteredStats, gestorView]);
 
-  // "Productividad por gestor" es solo de nuestro equipo — un externo/sin
-  // clasificar no es alguien a quien evaluarle cumplimiento.
-  // A diferencia de "Servicios por gestor" (que unifica todo lo externo),
-  // acá SÍ se quiere ver el nombre real de cada persona con cargo
-  // "AGILIZADOR NO ASIGNADO" (el cargo ya se ve aparte en su columna) — solo
-  // se excluye el caso sin ningún nombre real posible (nunca se registró
-  // ningún asignador para ese servicio).
-  const productividadStats = useMemo(() => filteredStats.filter((g) => !esSinNombre(g.gestor)), [filteredStats]);
+  // Muestra TODO, sin excluir nada — así la suma de esta tabla siempre
+  // coincide exacto con el total de "Servicios por gestor" (incluido el
+  // bloque "AGILIZADOR NO ASIGNADO" cuando no hay ningún asignador
+  // registrado: esa fila sale con Cargo "—" porque no hay nada que
+  // clasificar, pero su cantidad sí cuenta).
+  const productividadStats = filteredStats;
 
   return (
     <div>
