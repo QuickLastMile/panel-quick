@@ -178,9 +178,15 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
     const c = colaboradorPorClave.get(normKey(usuarioCancelacion));
     return c?.cargo || 'AGILIZADOR NO ASIGNADO';
   };
+  // Los usuarios ADMINISTRATIVO son cuentas compartidas — varias personas
+  // del área administrativa asignan servicios desde la misma cuenta, así
+  // que mostrar el nombre individual de BASE da una falsa sensación de que
+  // fue una sola persona. Se agrupan todos bajo "LÍNEA DE GESTIÓN".
   const gestorFor = (usuarioAsignacion: string): string => {
     const c = colaboradorPorClave.get(normKey(usuarioAsignacion));
-    return c ? c.colaborador.toUpperCase() : 'AGILIZADOR NO ASIGNADO';
+    if (!c) return 'AGILIZADOR NO ASIGNADO';
+    if (c.cargo.trim().toUpperCase() === 'ADMINISTRATIVO') return 'LÍNEA DE GESTIÓN';
+    return c.colaborador.toUpperCase();
   };
   const cargoGestorFor = (usuarioAsignacion: string): string => {
     const c = colaboradorPorClave.get(normKey(usuarioAsignacion));

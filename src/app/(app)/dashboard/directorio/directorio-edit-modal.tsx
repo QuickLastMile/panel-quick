@@ -7,7 +7,15 @@ import { X } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
 import { saveMensajero } from './actions';
 
-export default function DirectorioEditModal({ entry, onClose }: { entry: DirectorioEntry | null; onClose: () => void }) {
+export default function DirectorioEditModal({
+  entry,
+  proyectos,
+  onClose,
+}: {
+  entry: DirectorioEntry | null;
+  proyectos: string[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [form, setForm] = useState<DirectorioEntry | null>(entry);
@@ -135,14 +143,40 @@ export default function DirectorioEditModal({ entry, onClose }: { entry: Directo
               Vetado
             </label>
             {form.vetado && (
-              <div className="mt-3 grid grid-cols-2 gap-4">
+              <div className="mt-3 space-y-4">
                 <div>
-                  <label className={labelCls}>Proyecto donde está vetado</label>
-                  <input
-                    value={form.vetadoProyecto}
-                    onChange={(e) => setForm({ ...form, vetadoProyecto: e.target.value })}
-                    className={inputCls}
-                  />
+                  <label className={labelCls}>Proyecto(s) donde está vetado — puede marcar más de uno</label>
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-2">
+                    {proyectos.length === 0 ? (
+                      <p className="px-1 py-1 text-xs text-[var(--text-muted)]">No hay proyectos activos para elegir.</p>
+                    ) : (
+                      proyectos.map((p) => (
+                        <label key={p} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                          <input
+                            type="checkbox"
+                            checked={form.vetadoProyectos.includes(p)}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                vetadoProyectos: e.target.checked
+                                  ? [...form.vetadoProyectos, p]
+                                  : form.vetadoProyectos.filter((x) => x !== p),
+                              })
+                            }
+                            className="h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                          {p}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {form.vetadoProyectos.some((p) => !proyectos.includes(p)) && (
+                    <p className="mt-1.5 text-[11px] text-amber-400">
+                      Valor antiguo sin coincidencia exacta con un proyecto activo:{' '}
+                      {form.vetadoProyectos.filter((p) => !proyectos.includes(p)).join(', ')} — vuelva a marcar el/los proyecto(s)
+                      correcto(s) de la lista de arriba para que la alerta de reasignación funcione.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>Motivo</label>

@@ -38,6 +38,8 @@ export default async function MensajerosPage({
   const jefaturaParam = typeof sp.jefatura === 'string' ? sp.jefatura : '';
   const proyectoParam = parseProyectoParam(sp);
 
+  const TERMINAL = new Set(['Finalizado', 'Cancelado', 'Finalizado Cancelado']);
+
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();
   const cleanRows = allRows.filter((r) => !isSinClasificar(r.proyecto));
   const directorio = await getDirectorio();
@@ -49,6 +51,16 @@ export default async function MensajerosPage({
   const scopedRows = filterRowsByProyecto(filterRowsByJefatura(cleanRows, jefaturaParam), proyectoParam);
   const filteredRows = filterRowsByDate(scopedRows, filter);
   const stats = buildMensajeroStats(filteredRows);
+
+  // Mensajeros vetados de un proyecto que igual tienen una asignación
+  // activa EN ese proyecto ahora mismo — independiente del filtro de fecha
+  // de la página (es un problema vigente, no de "este mes"). Se usa para
+  // resaltar la bandera roja en la tabla.
+  const activeAssignments = cleanRows.filter((r) => r.identTrabajador && !TERMINAL.has(r.estado));
+  const violatingIds = directorio
+    .filter((e) => e.vetado && e.vetadoProyectos.length > 0)
+    .filter((e) => activeAssignments.some((a) => a.identTrabajador === e.identTrabajador && e.vetadoProyectos.includes(a.proyecto)))
+    .map((e) => e.identTrabajador);
 
   return (
     <div>
@@ -63,7 +75,7 @@ export default async function MensajerosPage({
       <ProyectoFilter proyectos={proyectos} selected={proyectoParam} />
       <DateFilterBar filter={filter} />
 
-      <MensajerosClient stats={stats} directorio={directorio} />
+      <MensajerosClient stats={stats} directorio={directorio} violatingIds={violatingIds} />
     </div>
   );
 }

@@ -12,10 +12,12 @@ type ActiveAssignment = { identTrabajador: string; proyecto: string; id: string;
 export default function DirectorioClient({
   entries,
   activeAssignments,
+  proyectos,
   canEdit,
 }: {
   entries: DirectorioEntry[];
   activeAssignments: ActiveAssignment[];
+  proyectos: string[];
   canEdit: boolean;
 }) {
   const [search, setSearch] = useState('');
@@ -31,6 +33,18 @@ export default function DirectorioClient({
       .filter((v) => v.foreign.length > 0);
   }, [entries, activeAssignments]);
 
+  // Alguien vetado de un proyecto que igual aparece con una asignación
+  // activa EN ese mismo proyecto — es justo lo que el veto debía evitar.
+  const vetoViolations = useMemo(() => {
+    return entries
+      .filter((e) => e.vetado && e.vetadoProyectos.length > 0)
+      .map((e) => ({
+        entry: e,
+        activas: activeAssignments.filter((a) => a.identTrabajador === e.identTrabajador && e.vetadoProyectos.includes(a.proyecto)),
+      }))
+      .filter((v) => v.activas.length > 0);
+  }, [entries, activeAssignments]);
+
   const filtered = useMemo(() => {
     if (!search) return entries;
     const q = search.toLowerCase();
@@ -39,6 +53,24 @@ export default function DirectorioClient({
 
   return (
     <div>
+      {vetoViolations.length > 0 && (
+        <div className="mb-5 rounded-xl border border-red-900/40 bg-red-950/30 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-red-300">
+            <AlertTriangle size={16} className="flex-none" />
+            {vetoViolations.length} mensajero{vetoViolations.length === 1 ? '' : 's'} vetado{vetoViolations.length === 1 ? '' : 's'} con
+            asignaciones activas EN el proyecto del que está vetado — reasignar ya.
+          </div>
+          <ul className="space-y-1 text-xs text-red-300/90">
+            {vetoViolations.map(({ entry, activas }) => (
+              <li key={entry.identTrabajador}>
+                <b>{entry.nombreTrabajador}</b> (vetado de {entry.vetadoProyectos.join(', ')}) tiene activo:{' '}
+                {activas.map((a) => `${a.id} (${a.proyecto})`).join(', ')}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {violations.length > 0 && (
         <div className="mb-5 rounded-xl border border-red-900/40 bg-red-950/30 p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-bold text-red-300">
@@ -103,6 +135,7 @@ export default function DirectorioClient({
               ) : (
                 filtered.map((e) => {
                   const hasViolation = violations.some((v) => v.entry.identTrabajador === e.identTrabajador);
+                  const hasVetoViolation = vetoViolations.some((v) => v.entry.identTrabajador === e.identTrabajador);
                   return (
                     <tr key={e.identTrabajador} className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
                       <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-[var(--text)]">{e.nombreTrabajador}</td>
@@ -120,11 +153,30 @@ export default function DirectorioClient({
                           {e.estado}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
+                      <td className="px-3 py-2.5">
                         {e.vetado ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10.5px] font-bold text-red-400" title={e.vetadoMotivo}>
-                            <Ban size={11} />
-                            {e.vetadoProyecto || 'Sí'}
+                          <span className="flex flex-wrap items-center gap-1">
+                            {hasVetoViolation && <AlertTriangle size={12} className="flex-none text-red-400" />}
+                            {e.vetadoProyectos.length ? (
+                              e.vetadoProyectos.map((p) => (
+                                <span
+                                  key={p}
+                                  title={e.vetadoMotivo}
+                                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-500/20 px-2 py-0.5 text-[10.5px] font-bold text-red-400"
+                                >
+                                  <Ban size={11} />
+                                  {p}
+                                </span>
+                              ))
+                            ) : (
+                              <span
+                                title={e.vetadoMotivo}
+                                className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-red-500/20 px-2 py-0.5 text-[10.5px] font-bold text-red-400"
+                              >
+                                <Ban size={11} />
+                                Sí
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <span className="text-[var(--text-muted)]">—</span>
@@ -164,7 +216,7 @@ export default function DirectorioClient({
         </div>
       </ChartCard>
 
-      {canEdit && <DirectorioEditModal entry={editing} onClose={() => setEditing(null)} />}
+      {canEdit && <DirectorioEditModal entry={editing} proyectos={proyectos} onClose={() => setEditing(null)} />}
     </div>
   );
 }

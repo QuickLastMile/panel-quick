@@ -1,6 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getDirectorio } from '@/lib/directorio';
-import { isSinClasificar } from '@/lib/aggregate';
+import { isSinClasificar, listProyectos } from '@/lib/aggregate';
 import { formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
@@ -38,6 +38,7 @@ export default async function DirectorioPage() {
   const activeAssignments = allRows
     .filter((r) => r.identTrabajador && !isSinClasificar(r.proyecto) && !TERMINAL.has(r.estado))
     .map((r) => ({ identTrabajador: r.identTrabajador, proyecto: r.proyecto, id: r.id, estado: r.estado }));
+  const proyectos = listProyectos(allRows);
 
   return (
     <div>
@@ -47,7 +48,7 @@ export default async function DirectorioPage() {
         accent="mensajeros"
         asOf={`Última sincronización: ${syncLabel} · ${entries.length.toLocaleString('es-CO')} registrados`}
       />
-      <DirectorioClient entries={entries} activeAssignments={activeAssignments} canEdit={role === 'admin'} />
+      <DirectorioClient entries={entries} activeAssignments={activeAssignments} proyectos={proyectos} canEdit={role === 'admin'} />
     </div>
   );
 }

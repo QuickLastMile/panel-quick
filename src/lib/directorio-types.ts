@@ -8,7 +8,7 @@ export type DirectorioEntry = {
   telefono: string;
   estado: 'Activo' | 'Inactivo';
   vetado: boolean;
-  vetadoProyecto: string;
+  vetadoProyectos: string[];
   vetadoMotivo: string;
   contratadoFijo: boolean;
   contratadoFijoProyecto: string;
@@ -23,7 +23,7 @@ export function emptyDirectorioEntry(identTrabajador = '', nombreTrabajador = ''
     telefono: '',
     estado: 'Activo',
     vetado: false,
-    vetadoProyecto: '',
+    vetadoProyectos: [],
     vetadoMotivo: '',
     contratadoFijo: false,
     contratadoFijoProyecto: '',

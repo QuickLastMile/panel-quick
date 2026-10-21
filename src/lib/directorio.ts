@@ -37,7 +37,7 @@ function rowToEntry(r: Record<string, unknown>): DirectorioEntry {
     telefono: s(r.telefono),
     estado: s(r.estado) === 'Inactivo' ? 'Inactivo' : 'Activo',
     vetado: Boolean(r.vetado),
-    vetadoProyecto: s(r.vetado_proyecto),
+    vetadoProyectos: Array.isArray(r.vetado_proyectos) ? (r.vetado_proyectos as unknown[]).map((v) => String(v)) : [],
     vetadoMotivo: s(r.vetado_motivo),
     contratadoFijo: Boolean(r.contratado_fijo),
     contratadoFijoProyecto: s(r.contratado_fijo_proyecto),
@@ -70,14 +70,14 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
 
   await getPool().query(
     `insert into public.directorio_mensajeros
-       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyecto, vetado_motivo, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
+       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
      on conflict (ident_trabajador) do update set
        nombre_trabajador = excluded.nombre_trabajador,
        telefono = excluded.telefono,
        estado = excluded.estado,
        vetado = excluded.vetado,
-       vetado_proyecto = excluded.vetado_proyecto,
+       vetado_proyectos = excluded.vetado_proyectos,
        vetado_motivo = excluded.vetado_motivo,
        contratado_fijo = excluded.contratado_fijo,
        contratado_fijo_proyecto = excluded.contratado_fijo_proyecto,
@@ -89,7 +89,7 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
       entry.telefono,
       entry.estado,
       entry.vetado,
-      entry.vetadoProyecto,
+      entry.vetadoProyectos,
       entry.vetadoMotivo,
       entry.contratadoFijo,
       entry.contratadoFijoProyecto,

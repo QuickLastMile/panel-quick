@@ -1,19 +1,30 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Flag, ChevronDown, ChevronUp } from 'lucide-react';
+import { Flag, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MensajeroStat } from '@/lib/aggregate';
 import { STATUS_COLOR } from '@/lib/status-colors';
 import type { DirectorioEntry } from '@/lib/directorio-types';
 import MensajeroDetailPanel, { type MensajeroDetailTarget } from '@/components/mensajero-detail-panel';
+import NovedadPopover from '@/components/novedad-popover';
 
 const PAGE_SIZE = 50;
 
-export default function MensajerosClient({ stats, directorio }: { stats: MensajeroStat[]; directorio: DirectorioEntry[] }) {
+export default function MensajerosClient({
+  stats,
+  directorio,
+  violatingIds,
+}: {
+  stats: MensajeroStat[];
+  directorio: DirectorioEntry[];
+  violatingIds: string[];
+}) {
   const [selected, setSelected] = useState<MensajeroDetailTarget | null>(null);
+  const [novedadEntry, setNovedadEntry] = useState<DirectorioEntry | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const dirMap = useMemo(() => new Map(directorio.map((d) => [d.identTrabajador, d])), [directorio]);
+  const violatingSet = useMemo(() => new Set(violatingIds), [violatingIds]);
 
   // Ordenado por cantidad de entregas (finalizados) — lo que pidió el
   // gerente, no por el índice de fidelidad (constancia + cumplimiento).
@@ -75,7 +86,28 @@ export default function MensajerosClient({ stats, directorio }: { stats: Mensaje
                     <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-[var(--text)]">
                       <span className="flex items-center gap-1.5">
                         #{i + 1} {s.nombreTrabajador}
-                        {dirEntry?.vetado && <Flag size={11} className="text-red-400" />}
+                        {dirEntry?.vetado && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNovedadEntry(dirEntry);
+                            }}
+                            title={
+                              violatingSet.has(s.identTrabajador)
+                                ? 'Vetado — tiene una asignación activa en un proyecto del que está vetado. Clic para ver el detalle.'
+                                : 'Vetado — clic para ver el detalle.'
+                            }
+                            className={`flex-none rounded-full p-0.5 transition-colors hover:bg-red-500/20 ${
+                              violatingSet.has(s.identTrabajador) ? 'animate-pulse' : ''
+                            }`}
+                          >
+                            {violatingSet.has(s.identTrabajador) ? (
+                              <AlertTriangle size={12} className="text-red-400" />
+                            ) : (
+                              <Flag size={11} className="text-red-400" />
+                            )}
+                          </button>
+                        )}
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-[var(--text-secondary)]">{s.identTrabajador}</td>
@@ -113,6 +145,7 @@ export default function MensajerosClient({ stats, directorio }: { stats: Mensaje
       )}
 
       <MensajeroDetailPanel target={selected} onClose={() => setSelected(null)} />
+      <NovedadPopover entry={novedadEntry} onClose={() => setNovedadEntry(null)} />
     </div>
   );
 }
