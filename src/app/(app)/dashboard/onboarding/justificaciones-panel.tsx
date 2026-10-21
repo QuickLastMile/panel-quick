@@ -11,21 +11,26 @@ function formatFechaLabel(iso: string): string {
 }
 
 // Sección de la pestaña Onboarding: qué colaboradores con 5+ días sin
-// gestión ya tienen una justificación escrita por el encargado HOY, cuáles
-// no, y el historial completo de justificaciones agrupado por el día en que
-// se escribieron (no el día que justifican — ver getJustificacionesHistorial).
+// gestión ya tienen una justificación escrita por el encargado en el día
+// seleccionado (arriba, en el filtro de fecha de la página — hoy por
+// defecto, pero si se mira "ayer" esto muestra lo de ayer), cuántos siguen
+// sin justificar, y el historial completo de justificaciones agrupado por
+// el día en que se escribieron (no el día que justifican — ver
+// getJustificacionesHistorial).
 export default function JustificacionesPanel({
   alertados,
   justificaciones,
-  hoy,
+  diaSeleccionado,
+  diaLabel,
 }: {
   alertados: AlertadoRow[];
   justificaciones: JustificacionEntry[];
-  hoy: string;
+  diaSeleccionado: string;
+  diaLabel: string;
 }) {
-  const justificadosHoyIds = new Set(justificaciones.filter((j) => j.fecha === hoy).map((j) => j.colaboradorId));
-  const justificadosHoy = alertados.filter((a) => justificadosHoyIds.has(a.id));
-  const sinJustificar = alertados.filter((a) => !justificadosHoyIds.has(a.id));
+  const justificadosIds = new Set(justificaciones.filter((j) => j.fecha === diaSeleccionado).map((j) => j.colaboradorId));
+  const justificados = alertados.filter((a) => justificadosIds.has(a.id));
+  const sinJustificar = alertados.filter((a) => !justificadosIds.has(a.id));
 
   const porDia = new Map<string, JustificacionEntry[]>();
   justificaciones.forEach((j) => {
@@ -39,20 +44,20 @@ export default function JustificacionesPanel({
     <div className="panel-card mt-5 rounded-xl p-5">
       <p className="mb-1 text-xs font-bold uppercase tracking-wide text-[var(--accent-bright)]">Justificaciones</p>
       <p className="mb-4 text-[11px] text-[var(--text-muted)]">
-        Colaboradores con 5 o más días sin gestión — quién ya tiene una observación escrita hoy por el encargado y quién sigue sin
-        justificar. Abajo, el historial completo de justificaciones por día.
+        Colaboradores con 5 o más días sin gestión — quién ya tiene una observación escrita por el encargado {diaLabel} y cuántos
+        siguen sin justificar. Abajo, el historial completo de justificaciones por día.
       </p>
 
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] p-3.5">
           <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-400">
-            <CheckCircle2 size={13} /> Justificado hoy ({justificadosHoy.length})
+            <CheckCircle2 size={13} /> Justificado {diaLabel} ({justificados.length})
           </p>
-          {justificadosHoy.length === 0 ? (
+          {justificados.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)]">Nadie todavía.</p>
           ) : (
             <ul className="space-y-1">
-              {justificadosHoy.map((a) => (
+              {justificados.map((a) => (
                 <li key={a.id} className="flex items-center justify-between text-xs text-[var(--text)]">
                   <span>{a.nombreCompleto}</span>
                   <span className="text-[var(--text-muted)]">{a.diasSinServicio}d</span>
@@ -62,21 +67,10 @@ export default function JustificacionesPanel({
           )}
         </div>
         <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] p-3.5">
-          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-400">
-            <AlertTriangle size={13} /> Sin justificar ({sinJustificar.length})
+          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-400">
+            <AlertTriangle size={13} /> Sin justificar
           </p>
-          {sinJustificar.length === 0 ? (
-            <p className="text-xs text-[var(--text-muted)]">Todos justificados.</p>
-          ) : (
-            <ul className="space-y-1">
-              {sinJustificar.map((a) => (
-                <li key={a.id} className="flex items-center justify-between text-xs text-[var(--text)]">
-                  <span>{a.nombreCompleto}</span>
-                  <span className="text-[var(--text-muted)]">{a.diasSinServicio}d</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--text)]">{sinJustificar.length}</p>
         </div>
       </div>
 

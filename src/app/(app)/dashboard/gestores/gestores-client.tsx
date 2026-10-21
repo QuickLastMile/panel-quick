@@ -37,6 +37,12 @@ const TIPO_ASIGNADOR_COLOR: Record<string, string> = {
   'AGILIZADOR NO ASIGNADO': '#8a8a8a',
 };
 
+// "AGILIZADOR NO ASIGNADO" no es una persona de nuestro equipo — es
+// cualquiera sin clasificar en BASE (externo, o sin asignador siquiera).
+function isNoAsignado(cargo: string): boolean {
+  return (cargo || '').trim().toUpperCase().startsWith('AGILIZADOR NO ASIGNADO');
+}
+
 // Formato militar HH:MM:SS para cualquier duración/tiempo promedio — se
 // redondea a segundos enteros antes de separar en h/m/s para no "acarrear"
 // un 59.6 suelto a un campo que ya pasó.
@@ -170,13 +176,36 @@ export default function GestoresClient({
     }));
   }, [porHoraAsignacion, fAsignadorFranja]);
 
+  // "Servicios por gestor" unifica a TODOS los externos/sin clasificar en
+  // una sola barra "AGILIZADOR NO ASIGNADO" — no son nuestro equipo, así que
+  // no importa quién sea cada uno puntualmente, solo el volumen total.
   const gestorChartItems = useMemo(() => {
-    if (gestorView === 'cantidad') return filteredStats.map((g) => ({ key: g.gestor, count: g.total }));
-    return filteredStats
-      .filter((g) => g.minutosAsignacionCount > 0)
-      .map((g) => ({ key: g.gestor, count: g.minutosAsignacionSum / g.minutosAsignacionCount }))
+    const porTeam: Record<string, { total: number; minSum: number; minCount: number }> = {};
+    let noAsignado = { total: 0, minSum: 0, minCount: 0 };
+    filteredStats.forEach((g) => {
+      if (isNoAsignado(g.cargo)) {
+        noAsignado = {
+          total: noAsignado.total + g.total,
+          minSum: noAsignado.minSum + g.minutosAsignacionSum,
+          minCount: noAsignado.minCount + g.minutosAsignacionCount,
+        };
+      } else {
+        porTeam[g.gestor] = { total: g.total, minSum: g.minutosAsignacionSum, minCount: g.minutosAsignacionCount };
+      }
+    });
+    const entries = Object.entries(porTeam).map(([gestor, v]) => ({ gestor, ...v }));
+    if (noAsignado.total > 0) entries.push({ gestor: 'AGILIZADOR NO ASIGNADO', ...noAsignado });
+
+    if (gestorView === 'cantidad') return entries.map((e) => ({ key: e.gestor, count: e.total }));
+    return entries
+      .filter((e) => e.minCount > 0)
+      .map((e) => ({ key: e.gestor, count: e.minSum / e.minCount }))
       .sort((a, b) => a.count - b.count);
   }, [filteredStats, gestorView]);
+
+  // "Productividad por gestor" es solo de nuestro equipo — un externo/sin
+  // clasificar no es alguien a quien evaluarle cumplimiento.
+  const productividadStats = useMemo(() => filteredStats.filter((g) => !isNoAsignado(g.cargo)), [filteredStats]);
 
   return (
     <div>
@@ -324,7 +353,7 @@ export default function GestoresClient({
               </tr>
             </thead>
             <tbody>
-              {filteredStats.map((g) => (
+              {productividadStats.map((g) => (
                 <tr
                   key={g.gestor}
                   onClick={() => setOpenGestor(g.gestor)}

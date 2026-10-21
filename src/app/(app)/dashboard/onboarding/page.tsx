@@ -42,10 +42,9 @@ export default async function OnboardingPage({
     getJustificacionesHistorial(),
   ]);
 
+  // "Días sin servicio" siempre es relativo al día real de hoy (es un
+  // estado operativo actual) — mismo criterio que la pestaña Vinculación.
   const hoy = bogotaToday();
-  const hoyIso = `${hoy.year}-${String(hoy.month).padStart(2, '0')}-${String(hoy.day).padStart(2, '0')}`;
-  // Mismo criterio que la pestaña Vinculación (ALERT_DIAS): desde el último
-  // servicio si ya tuvo alguno, si no desde que se vinculó.
   const alertados = colaboradoresBase
     .filter((c) => c.estado === 'ACTIVO')
     .map((c) => {
@@ -54,6 +53,11 @@ export default async function OnboardingPage({
       return { id: c.id, nombreCompleto: c.nombreCompleto, diasSinServicio };
     })
     .filter((c): c is { id: number; nombreCompleto: string; diasSinServicio: number } => c.diasSinServicio !== null && c.diasSinServicio >= ALERT_DIAS);
+
+  // La sección de Justificaciones sí sigue el filtro de fecha de la página:
+  // hoy muestra lo justificado hoy, si se mira "ayer" muestra lo de ayer.
+  const diaSeleccionado = `${filter.year}-${String(filter.month).padStart(2, '0')}-${String(filter.day).padStart(2, '0')}`;
+  const diaLabel = isToday(filter) ? 'hoy' : `el ${formatDateFilterLabel(filter)}`;
 
   const rows = filterRowsByDateField(allRows, filter, (r) => r.fechaVinculacion);
   // "Vinculados [día]" usa el día/mes que esté seleccionado en el filtro de
@@ -82,7 +86,7 @@ export default async function OnboardingPage({
         filterLabel={formatDateFilterLabel(filter)}
       />
 
-      <JustificacionesPanel alertados={alertados} justificaciones={justificaciones} hoy={hoyIso} />
+      <JustificacionesPanel alertados={alertados} justificaciones={justificaciones} diaSeleccionado={diaSeleccionado} diaLabel={diaLabel} />
     </div>
   );
 }
