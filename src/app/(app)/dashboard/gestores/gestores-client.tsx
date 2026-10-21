@@ -37,10 +37,20 @@ const TIPO_ASIGNADOR_COLOR: Record<string, string> = {
   'AGILIZADOR NO ASIGNADO': '#8a8a8a',
 };
 
-// "AGILIZADOR NO ASIGNADO" no es una persona de nuestro equipo — es
-// cualquiera sin clasificar en BASE (externo, o sin asignador siquiera).
-function isNoAsignado(cargo: string): boolean {
-  return (cargo || '').trim().toUpperCase().startsWith('AGILIZADOR NO ASIGNADO');
+// Dos casos MUY distintos, aunque los dos puedan mostrar el mismo texto:
+//   1) Alguien YA registrado en BASE con cargo "AGILIZADOR NO ASIGNADO" pero
+//      con nombre real conocido (ej. un agilizador externo) — SÍ es una
+//      persona identificable.
+//   2) El relleno genérico que usa gestorFor() cuando usuario_asignacion
+//      viene vacío o no hace match con nadie — ahí NO hay ningún nombre
+//      real posible, "AGILIZADOR NO ASIGNADO" es literalmente el nombre del
+//      gestor (no solo el cargo).
+function esNoAsignado(g: { gestor: string; cargo: string }): boolean {
+  if (esSinNombre(g.gestor)) return true;
+  return (g.cargo || '').trim().toUpperCase().startsWith('AGILIZADOR NO ASIGNADO');
+}
+function esSinNombre(gestor: string): boolean {
+  return (gestor || '').trim().toUpperCase() === 'AGILIZADOR NO ASIGNADO';
 }
 
 // Formato militar HH:MM:SS para cualquier duración/tiempo promedio — se
@@ -84,7 +94,9 @@ export default function GestoresClient({
 
   const asignadorPorTipo = useMemo(() => {
     const byKey = Object.fromEntries(porTipoAsignador.map((t) => [t.key, t.count]));
-    const agilizador = byKey['AGILIZADOR'] || 0;
+    // "Agiliz." agrupa AGILIZADOR + SUPERVISOR + VACACIONES — las tres son
+    // personal de campo/operativo, distinto de ADMINISTRATIVO (coordinación).
+    const agilizador = (byKey['AGILIZADOR'] || 0) + (byKey['SUPERVISOR'] || 0) + (byKey['VACACIONES'] || 0);
     const administrativo = byKey['ADMINISTRATIVO'] || 0;
     const base = agilizador + administrativo;
     return {
@@ -183,7 +195,7 @@ export default function GestoresClient({
     const porTeam: Record<string, { total: number; minSum: number; minCount: number }> = {};
     let noAsignado = { total: 0, minSum: 0, minCount: 0 };
     filteredStats.forEach((g) => {
-      if (isNoAsignado(g.cargo)) {
+      if (esNoAsignado(g)) {
         noAsignado = {
           total: noAsignado.total + g.total,
           minSum: noAsignado.minSum + g.minutosAsignacionSum,
@@ -205,7 +217,12 @@ export default function GestoresClient({
 
   // "Productividad por gestor" es solo de nuestro equipo — un externo/sin
   // clasificar no es alguien a quien evaluarle cumplimiento.
-  const productividadStats = useMemo(() => filteredStats.filter((g) => !isNoAsignado(g.cargo)), [filteredStats]);
+  // A diferencia de "Servicios por gestor" (que unifica todo lo externo),
+  // acá SÍ se quiere ver el nombre real de cada persona con cargo
+  // "AGILIZADOR NO ASIGNADO" (el cargo ya se ve aparte en su columna) — solo
+  // se excluye el caso sin ningún nombre real posible (nunca se registró
+  // ningún asignador para ese servicio).
+  const productividadStats = useMemo(() => filteredStats.filter((g) => !esSinNombre(g.gestor)), [filteredStats]);
 
   return (
     <div>
