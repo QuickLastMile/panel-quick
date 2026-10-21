@@ -41,7 +41,10 @@ function columnsFor(group: string): Col[] {
       ...CONDUCTOR_COLS,
       { key: 'razonCancelacion', label: 'Motivo', width: 180 },
       { key: 'nombreCancelador', label: 'Canceló', width: 200 },
-      { key: 'tipoCancelacion', label: 'Tipo cancelación', width: 150 },
+      // No es una categoría del motivo — es el cargo (BASE) de quien
+      // canceló (AGILIZADOR/ADMINISTRATIVO/etc.), igual que "Tipo" en la
+      // asignación. Nombrado distinto para no confundirlo con "Motivo".
+      { key: 'tipoCancelacion', label: 'Cargo de quien canceló', width: 170 },
     ];
   return BASE_COLS;
 }
@@ -69,6 +72,16 @@ function groupByEstado(rows: ServiceRow[]): Record<string, ServiceRow[]> {
   });
   if (otros.length) out['Otros'] = otros;
   return out;
+}
+
+// "DESCARTAR" es una marca interna (ver isExcludedTipoAsignador en
+// aggregate.ts) para excluir de las gráficas servicios sin asignador — no
+// un dato pensado para mostrarse tal cual en una celda (ej. en "En Espera",
+// donde aún no hay asignador porque el servicio no se ha gestionado).
+function formatCell(value: unknown): string {
+  const s = String(value ?? '').trim();
+  if (!s || s === 'DESCARTAR') return '—';
+  return s;
 }
 
 function distinct(rows: ServiceRow[], key: keyof ServiceRow, excludeSinClasificar = false): string[] {
@@ -338,7 +351,7 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
                         key={c.key}
                         className={`overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2 ${i === 0 ? 'font-semibold text-[var(--text)]' : 'text-[var(--text-secondary)]'}`}
                       >
-                        {String(row[c.key] || '—')}
+                        {formatCell(row[c.key])}
                       </td>
                     ))}
                   </tr>

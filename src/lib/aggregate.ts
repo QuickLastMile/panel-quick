@@ -359,6 +359,10 @@ export function buildDashboardData(allRows: ServiceRow[]): DashboardData {
     }
   > = {};
   rows.forEach((r) => {
+    // Sin asignador registrado = nadie gestionó esto todavía (ej. "En
+    // Espera") — no cuenta para NINGÚN gestor, ni siquiera como relleno
+    // genérico, porque literalmente no hubo ninguna gestión de asignación.
+    if (!r.usuarioAsignacion.trim()) return;
     const g = r.gestor || 'SIN GESTOR';
     if (SIN_CLASIFICAR.has(g.toUpperCase())) return;
     if (!porGestor[g]) {
