@@ -8,6 +8,12 @@
 import { Pool } from 'pg';
 import { getColaboradorBaseRows, saveColaboradorBaseRow } from './base';
 
+// OJO: estos son los nombres de columna REALES de bi_smart (lib/bi-db.ts),
+// no los nombres "estilo Sheet" que tenía la hoja Datos_Actuales. DÍA/MES/
+// AÑO SOLICITUD, MES SOLICITUD, HORA DE SERVICIO/CREACIÓN/ASIGNACIÓN y DÍAS
+// ANTICIPADOS DE CREACIÓN eran columnas CALCULADAS por fórmulas del Sheet a
+// partir de Fecha de solicitud/Fecha de creación/Fecha Hora Asignado — no
+// existen como columnas crudas en bi_smart. Se derivan acá (ver toDbRow).
 const COLS: Record<string, string> = {
   id: 'ID Servicio',
   estado: 'Estado',
@@ -20,14 +26,8 @@ const COLS: Record<string, string> = {
   descCancelacion: 'Descripcion de Cancelacion',
   usuarioCancelacion: 'Usuario Cancelación',
   usuarioAsignacion: 'Usuario Asignación',
-  diaSolicitud: 'DÍA SOLICITUD',
-  anioSolicitud: 'AÑO SOLICITUD',
-  mesNumSolicitud: 'MES # SOLICITUD',
-  mesSolicitud: 'MES SOLICITUD',
-  fechaSolicitud: 'FECHA SOLICITUD',
-  horaServicio: 'HORA DE SERVICIO',
-  fechaCreacion: 'FECHA CREACIÓN',
-  horaCreacion: 'HORA DE CREACIÓN',
+  fechaSolicitudRaw: 'Fecha de solicitud',
+  fechaCreacionRaw: 'Fecha de creación',
   servicio: 'Servicio',
   tipoServicio: 'Tipo de Servicio',
   valorDeclarado: 'Valor Declarado',
@@ -36,9 +36,7 @@ const COLS: Record<string, string> = {
   zona: 'Zona',
   email: 'Email',
   descripcion: 'Descripcion',
-  diasAnticipadosCreacion: 'DÍAS ANTICIPADAS DE CREACIÓN',
   fechaHoraAsignado: 'Fecha Hora Asignado',
-  horaAsignacion: 'HORA ASIGNACIÓN',
   minutosAsignacion: 'Minutos Tiempo Asignado',
 };
 
@@ -66,11 +64,52 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
+type DateParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+
+// bi-db.ts formatea los timestamps de bi_smart como texto plano
+// "AAAA-MM-DD HH:MM:SS" (ya en hora de Bogotá) — se parsea directo del
+// texto en vez de pasar por Date() para no arrastrar ningún lío de huso
+// horario adicional.
+function parseDateTimeStr(s: string): DateParts | null {
+  const str = (s || '').trim();
+  if (!str) return null;
+  const [datePart, timePart] = str.split(' ');
+  const [y, m, d] = (datePart || '').split('-').map(Number);
+  if (!y || !m || !d) return null;
+  let hour = 0, minute = 0, second = 0;
+  if (timePart) {
+    const [h2, m2, s2] = timePart.split(':').map(Number);
+    hour = h2 || 0;
+    minute = m2 || 0;
+    second = s2 || 0;
+  }
+  return { year: y, month: m, day: d, hour, minute, second };
+}
+
+const MES_ABREV = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEPT', 'OCT', 'NOV', 'DIC'];
+
+function formatFechaDMA(p: DateParts | null): string | null {
+  return p ? `${p.day}/${p.month}/${p.year}` : null;
+}
+function formatHora(p: DateParts | null): string {
+  return p ? `${pad2(p.hour)}:${pad2(p.minute)}:${pad2(p.second)}` : '00:00:00';
+}
+function daysBetweenYMD(a: DateParts, b: DateParts): number {
+  const da = Date.UTC(a.year, a.month - 1, a.day);
+  const db = Date.UTC(b.year, b.month - 1, b.day);
+  return Math.round((db - da) / 86400000);
+}
+
 function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
-  const dia = getNum(row, idx.diaSolicitud);
-  const mes = getNum(row, idx.mesNumSolicitud);
-  const anio = getNum(row, idx.anioSolicitud);
-  const fechaSolicitudDate = dia && mes && anio ? `${anio}-${pad2(mes)}-${pad2(dia)}` : null;
+  const pSolicitud = parseDateTimeStr(getStr(row, idx.fechaSolicitudRaw));
+  const pCreacion = parseDateTimeStr(getStr(row, idx.fechaCreacionRaw));
+  const pAsignado = parseDateTimeStr(getStr(row, idx.fechaHoraAsignado));
+
+  const dia = pSolicitud?.day ?? null;
+  const mes = pSolicitud?.month ?? null;
+  const anio = pSolicitud?.year ?? null;
+  const fechaSolicitudDate = pSolicitud ? `${anio}-${pad2(mes!)}-${pad2(dia!)}` : null;
+  const diasAnticipadosCreacion = pSolicitud && pCreacion ? daysBetweenYMD(pCreacion, pSolicitud) : null;
 
   return [
     getStr(row, idx.id),
@@ -87,12 +126,12 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
     dia,
     anio,
     mes,
-    getStr(row, idx.mesSolicitud) || null,
-    getStr(row, idx.fechaSolicitud) || null,
+    pSolicitud ? MES_ABREV[pSolicitud.month - 1] : null,
+    formatFechaDMA(pSolicitud),
     fechaSolicitudDate,
-    getStr(row, idx.horaServicio) || null,
-    getStr(row, idx.fechaCreacion) || null,
-    getStr(row, idx.horaCreacion) || null,
+    formatHora(pSolicitud),
+    formatFechaDMA(pCreacion),
+    formatHora(pCreacion),
     getStr(row, idx.servicio) || null,
     getStr(row, idx.tipoServicio) || null,
     getNum(row, idx.valorDeclarado),
@@ -101,9 +140,9 @@ function toDbRow(row: unknown[], idx: Record<string, number>): DbRow {
     getStr(row, idx.zona) || null,
     getStr(row, idx.email) || null,
     getStr(row, idx.descripcion) || null,
-    getNum(row, idx.diasAnticipadosCreacion),
+    diasAnticipadosCreacion,
     getStr(row, idx.fechaHoraAsignado) || null,
-    getStr(row, idx.horaAsignacion) || null,
+    formatHora(pAsignado),
     getNum(row, idx.minutosAsignacion),
   ];
 }
