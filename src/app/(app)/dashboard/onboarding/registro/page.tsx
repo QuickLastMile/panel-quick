@@ -1,4 +1,4 @@
-import { getColaboradoresConStats } from '@/lib/colaboradores';
+import { getColaboradoresConStats, getJustificacionesHistorial } from '@/lib/colaboradores';
 import { requireRole } from '@/lib/session';
 import { bogotaToday, daysBetween } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
@@ -18,8 +18,10 @@ function isoToParts(iso: string | null) {
 
 export default async function RegistroColaboradoresPage() {
   const role = await requireRole(['admin', 'onboarding']);
-  const base = await getColaboradoresConStats();
+  const [base, justificaciones] = await Promise.all([getColaboradoresConStats(), getJustificacionesHistorial()]);
   const today = bogotaToday();
+  const todayIso = `${today.year}-${String(today.month).padStart(2, '0')}-${String(today.day).padStart(2, '0')}`;
+  const justificadosHoyIds = Array.from(new Set(justificaciones.filter((j) => j.fecha === todayIso).map((j) => j.colaboradorId)));
 
   // Días sin servicio: desde el último servicio si ya tuvo alguno, si no
   // desde que se vinculó — así un colaborador recién vinculado no dispara
@@ -38,7 +40,7 @@ export default async function RegistroColaboradoresPage() {
         accent="colaboradores"
         asOf={`${colaboradores.length.toLocaleString('es-CO')} registrados en total`}
       />
-      <RegistroClient colaboradores={colaboradores} canVerTodo={role !== 'onboarding'} />
+      <RegistroClient colaboradores={colaboradores} canVerTodo={role !== 'onboarding'} justificadosHoyIds={justificadosHoyIds} />
     </div>
   );
 }

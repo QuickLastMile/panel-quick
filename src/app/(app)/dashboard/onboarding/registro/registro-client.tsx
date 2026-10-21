@@ -488,7 +488,19 @@ const tabBtnCls = (active: boolean) =>
     active ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
   }`;
 
-export default function RegistroClient({ colaboradores }: { colaboradores: Row[]; canVerTodo: boolean }) {
+export default function RegistroClient({
+  colaboradores,
+  justificadosHoyIds,
+}: {
+  colaboradores: Row[];
+  canVerTodo: boolean;
+  // IDs de colaborador con una justificación escrita por el encargado HOY
+  // (ver colaboradores_historial, campo observacion_no_prestacion) — para
+  // marcar visualmente quién ya quedó justificado sin tener que ir a la
+  // sección de Justificaciones en Onboarding.
+  justificadosHoyIds: number[];
+}) {
+  const justificadosHoySet = useMemo(() => new Set(justificadosHoyIds), [justificadosHoyIds]);
   const router = useRouter();
   const [estadoTab, setEstadoTab] = useState<'activo' | 'inactivo'>('activo');
   const [gestionFiltro, setGestionFiltro] = useState<'todos' | 'gestionando' | 'sin-gestionar'>('todos');
@@ -707,17 +719,35 @@ export default function RegistroClient({ colaboradores }: { colaboradores: Row[]
                       {r.diasSinServicio === null ? (
                         '—'
                       ) : (
-                        <span
-                          className={
-                            alertaTipo(r) === 'nunca-gestiono'
-                              ? 'font-bold text-amber-400'
-                              : alertaTipo(r) === 'dejo-gestionar'
-                                ? 'font-bold text-violet-400'
-                                : 'text-[var(--text-secondary)]'
-                          }
-                        >
-                          {r.diasSinServicio}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={
+                              alertaTipo(r) === 'nunca-gestiono'
+                                ? 'font-bold text-amber-400'
+                                : alertaTipo(r) === 'dejo-gestionar'
+                                  ? 'font-bold text-violet-400'
+                                  : 'text-[var(--text-secondary)]'
+                            }
+                          >
+                            {r.diasSinServicio}
+                          </span>
+                          {alertaTipo(r) !== 'ninguna' &&
+                            (justificadosHoySet.has(r.id) ? (
+                              <span
+                                title="Ya tiene una justificación escrita hoy"
+                                className="inline-flex items-center gap-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-emerald-400"
+                              >
+                                <Check size={9} /> Justificado
+                              </span>
+                            ) : (
+                              <span
+                                title="Todavía no tiene justificación escrita hoy"
+                                className="inline-flex items-center gap-0.5 rounded-full border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-red-400"
+                              >
+                                <AlertTriangle size={9} /> Sin justificar
+                              </span>
+                            ))}
+                        </div>
                       )}
                     </td>
                     {estadoTab === 'inactivo' && <td className="max-w-[220px] whitespace-normal px-3 py-2.5 text-[var(--text-secondary)]">{r.motivoInactivacion || '—'}</td>}
