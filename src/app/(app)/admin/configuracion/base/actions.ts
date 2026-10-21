@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireRole, getSession } from '@/lib/session';
 import { saveProyectoBaseRow, saveColaboradorBaseRow } from '@/lib/base';
+import { setMotivoCuentaEnPerdida } from '@/lib/motivos-cancelacion';
 
 export async function saveProyecto(row: {
   originalEmail?: string;
@@ -39,5 +40,19 @@ export async function saveColaborador(row: {
   }
   revalidatePath('/admin/configuracion/base');
   revalidatePath('/admin/configuracion/historial');
+  return {};
+}
+
+export async function setMotivoCuenta(motivo: string, cuentaEnPerdida: boolean): Promise<{ error?: string }> {
+  await requireRole(['admin']);
+  const session = await getSession();
+  try {
+    await setMotivoCuentaEnPerdida(motivo, cuentaEnPerdida, session?.email || 'desconocido');
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'No se pudo guardar.' };
+  }
+  revalidatePath('/admin/configuracion/base');
+  revalidatePath('/admin/configuracion/historial');
+  revalidatePath('/dashboard/cancelaciones');
   return {};
 }

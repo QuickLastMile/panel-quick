@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
 import type { ProyectoBaseRow, ColaboradorBaseRow } from '@/lib/base';
-import { saveProyecto, saveColaborador } from './actions';
+import type { MotivoCancelacionConfig } from '@/lib/motivos-cancelacion';
+import { saveProyecto, saveColaborador, setMotivoCuenta } from './actions';
 
 const inputCls =
   'w-full rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)]';
@@ -236,6 +237,46 @@ function ColaboradorForm({
   );
 }
 
+// Toggle "Cuenta como pérdida" por motivo — guarda solo, sin modal (son
+// pocos motivos y es un simple sí/no, no hace falta un formulario aparte).
+function MotivoToggleRow({ motivo, cuentaEnPerdida }: MotivoCancelacionConfig) {
+  const router = useRouter();
+  const [value, setValue] = useState(cuentaEnPerdida);
+  const [saving, setSaving] = useState(false);
+
+  async function toggle() {
+    const next = !value;
+    setValue(next);
+    setSaving(true);
+    const res = await setMotivoCuenta(motivo, next);
+    setSaving(false);
+    if (res.error) {
+      setValue(!next);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <tr className="border-b border-[var(--border)] transition-colors hover:bg-[var(--surface-hover)]">
+      <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-[var(--text)]">{motivo}</td>
+      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+        <button
+          onClick={toggle}
+          disabled={saving}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide transition-colors disabled:opacity-50 ${
+            value
+              ? 'border-red-500/40 bg-red-500/10 text-red-400'
+              : 'border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--text-muted)]'
+          }`}
+        >
+          {value ? 'Cuenta como pérdida' : 'No cuenta'}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 const subTabBtnCls = (active: boolean) =>
   `rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all duration-150 ${
     active ? 'bg-gradient-gold text-[#141008] shadow-[0_0_12px_rgba(214,164,25,0.25)]' : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
@@ -248,6 +289,7 @@ export default function BaseClient({
   colaboradoresSinClasificar,
   jefaturasExistentes,
   gestoresExistentes,
+  motivosCancelacion,
 }: {
   proyectoRows: ProyectoBaseRow[];
   colaboradorRows: ColaboradorBaseRow[];
@@ -255,8 +297,9 @@ export default function BaseClient({
   colaboradoresSinClasificar: { colaboradorData: string; count: number }[];
   jefaturasExistentes: string[];
   gestoresExistentes: string[];
+  motivosCancelacion: MotivoCancelacionConfig[];
 }) {
-  const [tab, setTab] = useState<'proyecto' | 'colaborador'>('proyecto');
+  const [tab, setTab] = useState<'proyecto' | 'colaborador' | 'cancelacion'>('proyecto');
   const [proyectoSubTab, setProyectoSubTab] = useState<'especificado' | 'no-especificado'>('especificado');
   const [colaboradorSubTab, setColaboradorSubTab] = useState<'especificado' | 'no-especificado'>('especificado');
   const [search, setSearch] = useState('');
@@ -283,6 +326,9 @@ export default function BaseClient({
         </button>
         <button onClick={() => setTab('colaborador')} className={subTabBtnCls(tab === 'colaborador')}>
           Gestor / Cargo (por Usuario Asignación)
+        </button>
+        <button onClick={() => setTab('cancelacion')} className={subTabBtnCls(tab === 'cancelacion')}>
+          Tipos de cancelación
         </button>
       </div>
 
@@ -503,6 +549,44 @@ export default function BaseClient({
               </div>
             </>
           )}
+        </>
+      )}
+
+      {tab === 'cancelacion' && (
+        <>
+          <p className="mb-4 text-xs text-[var(--text-secondary)]">
+            Marca qué motivos de cancelación cuentan como pérdida (error de gestión) en la pestaña Cancelación — los demás (ej.
+            "Cliente cancela servicio") se siguen viendo en las gráficas, pero no suman al valor perdido.
+          </p>
+          <div className="panel-card overflow-hidden rounded-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    {['Motivo', ''].map((h) => (
+                      <th
+                        key={h}
+                        className="border-b border-[var(--border)] bg-[var(--surface-sunken)] px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {motivosCancelacion.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="px-4 py-10 text-center text-[var(--text-muted)]">
+                        Aún no hay cancelaciones registradas.
+                      </td>
+                    </tr>
+                  ) : (
+                    motivosCancelacion.map((m) => <MotivoToggleRow key={m.motivo} {...m} />)
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       )}
 

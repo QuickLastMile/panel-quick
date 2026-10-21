@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Gauge, ClipboardList, Users, UserPlus, UserCog, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser } from 'lucide-react';
+import { Gauge, ClipboardList, Users, UserPlus, UserCog, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Trophy, BookUser, XCircle } from 'lucide-react';
 import { logout } from '@/app/login/actions';
 import type { Role } from '@/lib/auth';
 import { ROLE_LABEL } from '@/lib/auth';
@@ -12,6 +12,7 @@ const NAV = [
   { href: '/dashboard', label: 'Reporte general', icon: Gauge, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/gestion', label: 'Gestión', icon: ClipboardList, roles: ['admin', 'supervisor', 'coordinador'] },
   { href: '/dashboard/gestores', label: 'Seguimiento gestores', icon: Users, roles: ['admin', 'supervisor'] },
+  { href: '/dashboard/cancelaciones', label: 'Cancelación', icon: XCircle, roles: ['admin', 'supervisor'] },
   { href: '/dashboard/onboarding', label: 'Onboarding', icon: UserPlus, roles: ['admin', 'supervisor', 'onboarding'] },
   { href: '/dashboard/onboarding/registro', label: 'Vinculación', icon: UserCog, roles: ['admin', 'onboarding'] },
   { href: '/dashboard/mensajeros', label: 'Ranking mensajeros', icon: Trophy, roles: ['admin', 'supervisor'] },

@@ -1,5 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getProyectoBaseRows, getColaboradorBaseRows } from '@/lib/base';
+import { getMotivosCancelacionConfig, ensureMotivosRegistrados, normalizeMotivo } from '@/lib/motivos-cancelacion';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
@@ -47,6 +48,15 @@ export default async function BaseConfigPage() {
   const jefaturasExistentes = Array.from(new Set(proyectoRows.map((r) => r.jefatura).filter(Boolean))).sort();
   const gestoresExistentes = Array.from(new Set(colaboradorRows.map((r) => r.colaborador).filter(Boolean))).sort();
 
+  // Si aparece un motivo de cancelación nuevo, se registra sin clasificar
+  // (cuenta_en_perdida = false) para que salga en la lista y la usuaria lo
+  // clasifique — nunca se pierde uno silenciosamente.
+  const motivosVistos = rows
+    .filter((r) => r.estado === 'Cancelado' || r.estado === 'Finalizado Cancelado')
+    .map((r) => normalizeMotivo(r.razonCancelacion));
+  await ensureMotivosRegistrados(motivosVistos);
+  const motivosCancelacion = await getMotivosCancelacionConfig();
+
   return (
     <div>
       <PageHeader eyebrow="Configuración" title="Base de" accent="cruce (PROYECTO / GESTOR)" />
@@ -67,6 +77,7 @@ export default async function BaseConfigPage() {
         colaboradoresSinClasificar={colaboradoresSinClasificar}
         jefaturasExistentes={jefaturasExistentes}
         gestoresExistentes={gestoresExistentes}
+        motivosCancelacion={motivosCancelacion}
       />
     </div>
   );
