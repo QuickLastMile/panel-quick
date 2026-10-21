@@ -6,6 +6,10 @@ import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
 import GestoresClient from './gestores-client';
 
+// Ver dashboard/page.tsx: getSheetsSnapshot() puede tardar 25-30s con la
+// tabla actual — sin esto, Vercel corta la función y la página queda vacía.
+export const maxDuration = 60;
+
 export default async function GestoresPage({
   searchParams,
 }: {

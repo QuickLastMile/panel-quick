@@ -8,6 +8,10 @@ import DirectorioClient from './directorio-client';
 
 const TERMINAL = new Set(['Finalizado', 'Cancelado', 'Finalizado Cancelado']);
 
+// Ver dashboard/page.tsx: getSheetsSnapshot() puede tardar 25-30s con la
+// tabla actual — sin esto, Vercel corta la función y la página queda vacía.
+export const maxDuration = 60;
+
 export default async function DirectorioPage() {
   const role = await requireRole(['admin', 'supervisor']);
   const { rows: allRows, lastSyncedAt } = await getSheetsSnapshot();

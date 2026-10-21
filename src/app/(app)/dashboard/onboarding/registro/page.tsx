@@ -4,6 +4,11 @@ import { bogotaToday, daysBetween } from '@/lib/date-filter';
 import PageHeader from '@/components/page-header';
 import RegistroClient from './registro-client';
 
+// El detalle de un colaborador llama getServiciosDeVinculado() (actions.ts),
+// que usa getSheetsSnapshot() — puede tardar 25-30s con la tabla actual.
+// Sin esto, Vercel corta la acción a medias.
+export const maxDuration = 60;
+
 function isoToParts(iso: string | null) {
   if (!iso) return null;
   const [y, m, d] = iso.split('-').map(Number);

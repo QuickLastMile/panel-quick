@@ -27,6 +27,11 @@ import DiaTrendChart from '@/components/charts/dia-trend-chart';
 import JefaturaChartCard from '@/components/charts/jefatura-chart-card';
 import DobleAsignacionAlert from '@/components/doble-asignacion-alert';
 
+// public.services ya pasa de 118k filas sin filtro de fecha — getSheetsSnapshot()
+// puede tardar 25-30s. Sin esto, Vercel corta la función antes de terminar y la
+// página queda en blanco (visto en producción: "no veo nada de información").
+export const maxDuration = 60;
+
 const STATUS_ICON = {
   'En Espera': Clock,
   'Asignado': UserCheck,

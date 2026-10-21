@@ -5,6 +5,10 @@ import PageHeader from '@/components/page-header';
 import ConfigTabs from '@/components/config-tabs';
 import BaseClient from './base-client';
 
+// Ver dashboard/page.tsx: getSheetsSnapshot() puede tardar 25-30s con la
+// tabla actual — sin esto, Vercel corta la función y la página queda vacía.
+export const maxDuration = 60;
+
 export default async function BaseConfigPage() {
   await requireRole(['admin']);
 

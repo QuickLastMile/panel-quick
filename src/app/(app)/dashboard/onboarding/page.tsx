@@ -9,6 +9,11 @@ import OnboardingClient from './onboarding-client';
 // Agilizador al que se le hace seguimiento puntual de meta (5/día, 130/mes).
 const AGILIZADOR_SEGUIMIENTO = 'ZAMIR ANDRES ARCIA';
 
+// El panel de detalle de un vinculado llama getServiciosDeVinculado()
+// (actions.ts), que usa getSheetsSnapshot() — puede tardar 25-30s con la
+// tabla actual. Sin esto, Vercel corta la acción a medias.
+export const maxDuration = 60;
+
 export default async function OnboardingPage({
   searchParams,
 }: {
