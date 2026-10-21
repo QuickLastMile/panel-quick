@@ -20,6 +20,7 @@ const BASE_COLS: Col[] = [
   { key: 'horaServicio', label: 'Hora servicio', width: 110 },
   { key: 'direccion', label: 'Dirección', width: 220 },
   { key: 'ciudad', label: 'Ciudad', width: 120 },
+  { key: 'tipoVehiculo', label: 'Tipo de vehículo', width: 130 },
   { key: 'fechaCreacion', label: 'Fecha creación', width: 120 },
   { key: 'horaCreacion', label: 'Hora creación', width: 110 },
   // Nombre real de quien asignó, tal cual aparece en la data — no el

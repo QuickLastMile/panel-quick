@@ -40,6 +40,11 @@ export type ServiceRow = {
   jefatura: string;
   servicio: string;
   tipoServicio: string;
+  // Derivado de tipoServicio — bi_smart no trae un campo de vehículo propio
+  // (ver tipoVehiculoFor). "Domicilio"/"Mensajería" -> Motorizado, "Carry"
+  // -> Carry; cualquier otro tipo de servicio se deja tal cual (no se
+  // adivina un vehículo para categorías que no son de última milla).
+  tipoVehiculo: string;
   valorDeclarado: number | null;
   precioTotal: number | null;
   ganancias: number | null;
@@ -115,6 +120,20 @@ function nombreDesdeIdNombre(idNombre: string): string {
 }
 
 const normKey = (v: string): string => v.trim().toLowerCase();
+
+// bi_smart no tiene un campo de vehículo por servicio — se deriva de
+// "Tipo de Servicio" (confirmado con la usuaria): Domicilio/Mensajería son
+// motorizado, Carry es Carry. Variantes tipo "Domicilio Cross"/"Carry Cross"
+// cuentan igual (coincidencia por substring). Lo demás (Carga Nacional, LTL,
+// PQ Nacional, etc.) no es de última milla — se deja el texto original en
+// vez de adivinar un vehículo.
+function tipoVehiculoFor(tipoServicio: string): string {
+  const s = tipoServicio.trim().toLowerCase();
+  if (!s) return '';
+  if (s.includes('domicilio') || s.includes('mensajer')) return 'Motorizado';
+  if (s.includes('carry')) return 'Carry';
+  return tipoServicio.trim();
+}
 
 const toNum = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null;
@@ -209,6 +228,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
         jefatura: jefaturaFor(email),
         servicio: toStr(r.servicio),
         tipoServicio: toStr(r.tipo_servicio),
+        tipoVehiculo: tipoVehiculoFor(toStr(r.tipo_servicio)),
         valorDeclarado: toNum(r.valor_declarado),
         precioTotal: toNum(r.precio_total),
         ganancias: toNum(r.ganancias),
