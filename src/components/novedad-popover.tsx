@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Ban, BadgeCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
+import { esAsignacionPosteriorAlVeto } from '@/lib/directorio-types';
 import { getServiciosDeMensajero } from '@/app/(app)/dashboard/mensajeros/actions';
 
 const TERMINAL = new Set(['Finalizado', 'Cancelado', 'Finalizado Cancelado']);
 
+type Activo = { id: string; proyecto: string; estado: string; fechaHoraAsignado: string; fechaSolicitud: string };
+
 export default function NovedadPopover({ entry, onClose }: { entry: DirectorioEntry | null; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
-  const [activos, setActivos] = useState<{ id: string; proyecto: string; estado: string } [] | null>(null);
+  const [activos, setActivos] = useState<Activo[] | null>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -24,7 +27,17 @@ export default function NovedadPopover({ entry, onClose }: { entry: DirectorioEn
     let cancelled = false;
     getServiciosDeMensajero(entry.identTrabajador).then((rows) => {
       if (cancelled) return;
-      setActivos(rows.filter((r) => !TERMINAL.has(r.estado)).map((r) => ({ id: r.id, proyecto: r.proyecto, estado: r.estado })));
+      setActivos(
+        rows
+          .filter((r) => !TERMINAL.has(r.estado))
+          .map((r) => ({
+            id: r.id,
+            proyecto: r.proyecto,
+            estado: r.estado,
+            fechaHoraAsignado: r.fechaHoraAsignado,
+            fechaSolicitud: r.fechaSolicitud,
+          }))
+      );
     });
     return () => {
       cancelled = true;
@@ -42,7 +55,9 @@ export default function NovedadPopover({ entry, onClose }: { entry: DirectorioEn
 
   if (!entry || !mounted) return null;
 
-  const violacion = activos ? activos.filter((a) => entry.vetadoProyectos.includes(a.proyecto)) : [];
+  const violacion = activos
+    ? activos.filter((a) => entry.vetadoProyectos.includes(a.proyecto) && esAsignacionPosteriorAlVeto(a, entry.vetadoDesde))
+    : [];
 
   return createPortal(
     <>
@@ -69,6 +84,11 @@ export default function NovedadPopover({ entry, onClose }: { entry: DirectorioEn
               <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-red-300">
                 <Ban size={13} />
                 Vetado {entry.vetadoProyectos.length ? `de ${entry.vetadoProyectos.length} proyecto${entry.vetadoProyectos.length === 1 ? '' : 's'}` : ''}
+                {entry.vetadoDesde && (
+                  <span className="font-normal text-red-300/70">
+                    · desde {entry.vetadoDesde.split('-').reverse().join('/')}
+                  </span>
+                )}
               </p>
               {entry.vetadoProyectos.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1">

@@ -39,6 +39,7 @@ function rowToEntry(r: Record<string, unknown>): DirectorioEntry {
     vetado: Boolean(r.vetado),
     vetadoProyectos: Array.isArray(r.vetado_proyectos) ? (r.vetado_proyectos as unknown[]).map((v) => String(v)) : [],
     vetadoMotivo: s(r.vetado_motivo),
+    vetadoDesde: r.vetado_desde ? new Date(r.vetado_desde as string).toISOString().slice(0, 10) : '',
     contratadoFijo: Boolean(r.contratado_fijo),
     contratadoFijoProyecto: s(r.contratado_fijo_proyecto),
     notas: s(r.notas),
@@ -68,10 +69,26 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
   const ident = entry.identTrabajador.trim();
   if (!ident) throw new Error('Falta la identificación del trabajador.');
 
-  await getPool().query(
+  const pool = getPool();
+
+  // `vetado_desde` no se edita a mano — se calcula acá: si ya estaba
+  // vetado se conserva la fecha original (para que la alerta de
+  // reasignación no se "reinicie" cada vez que se edita otro campo), y si
+  // recién se está marcando vetado ahora, se estampa hoy.
+  let vetadoDesde: string | null = null;
+  if (entry.vetado) {
+    const before = await pool.query(
+      `select vetado, vetado_desde from public.directorio_mensajeros where ident_trabajador = $1`,
+      [ident]
+    );
+    const prev = before.rows[0];
+    vetadoDesde = prev?.vetado && prev.vetado_desde ? prev.vetado_desde : new Date().toISOString().slice(0, 10);
+  }
+
+  await pool.query(
     `insert into public.directorio_mensajeros
-       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, vetado_desde, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
      on conflict (ident_trabajador) do update set
        nombre_trabajador = excluded.nombre_trabajador,
        telefono = excluded.telefono,
@@ -79,6 +96,7 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
        vetado = excluded.vetado,
        vetado_proyectos = excluded.vetado_proyectos,
        vetado_motivo = excluded.vetado_motivo,
+       vetado_desde = excluded.vetado_desde,
        contratado_fijo = excluded.contratado_fijo,
        contratado_fijo_proyecto = excluded.contratado_fijo_proyecto,
        notas = excluded.notas,
@@ -91,6 +109,7 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
       entry.vetado,
       entry.vetadoProyectos,
       entry.vetadoMotivo,
+      vetadoDesde,
       entry.contratadoFijo,
       entry.contratadoFijoProyecto,
       entry.notas,

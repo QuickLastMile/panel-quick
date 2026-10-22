@@ -3,11 +3,18 @@
 import { useMemo, useState } from 'react';
 import { Plus, Pencil, AlertTriangle, Ban, BadgeCheck } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
-import { emptyDirectorioEntry } from '@/lib/directorio-types';
+import { emptyDirectorioEntry, esAsignacionPosteriorAlVeto } from '@/lib/directorio-types';
 import ChartCard from '@/components/charts/chart-card';
 import DirectorioEditModal from './directorio-edit-modal';
 
-type ActiveAssignment = { identTrabajador: string; proyecto: string; id: string; estado: string };
+type ActiveAssignment = {
+  identTrabajador: string;
+  proyecto: string;
+  id: string;
+  estado: string;
+  fechaHoraAsignado: string;
+  fechaSolicitud: string;
+};
 
 export default function DirectorioClient({
   entries,
@@ -40,7 +47,12 @@ export default function DirectorioClient({
       .filter((e) => e.vetado && e.vetadoProyectos.length > 0)
       .map((e) => ({
         entry: e,
-        activas: activeAssignments.filter((a) => a.identTrabajador === e.identTrabajador && e.vetadoProyectos.includes(a.proyecto)),
+        activas: activeAssignments.filter(
+          (a) =>
+            a.identTrabajador === e.identTrabajador &&
+            e.vetadoProyectos.includes(a.proyecto) &&
+            esAsignacionPosteriorAlVeto(a, e.vetadoDesde)
+        ),
       }))
       .filter((v) => v.activas.length > 0);
   }, [entries, activeAssignments]);

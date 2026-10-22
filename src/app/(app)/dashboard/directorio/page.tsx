@@ -37,7 +37,14 @@ export default async function DirectorioPage() {
   // "contratado fijo" en un proyecto que igual aparecen trabajando en otro.
   const activeAssignments = allRows
     .filter((r) => r.identTrabajador && !isSinClasificar(r.proyecto) && !TERMINAL.has(r.estado))
-    .map((r) => ({ identTrabajador: r.identTrabajador, proyecto: r.proyecto, id: r.id, estado: r.estado }));
+    .map((r) => ({
+      identTrabajador: r.identTrabajador,
+      proyecto: r.proyecto,
+      id: r.id,
+      estado: r.estado,
+      fechaHoraAsignado: r.fechaHoraAsignado,
+      fechaSolicitud: r.fechaSolicitud,
+    }));
   const proyectos = listProyectos(allRows);
 
   return (

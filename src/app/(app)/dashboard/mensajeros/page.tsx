@@ -10,6 +10,7 @@ import {
 } from '@/lib/aggregate';
 import { parseDateFilterParams, filterRowsByDate, formatDateFilterLabel, formatBogotaDateTime } from '@/lib/date-filter';
 import { getDirectorio } from '@/lib/directorio';
+import { esAsignacionPosteriorAlVeto } from '@/lib/directorio-types';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
 import DateFilterBar from '@/components/date-filter';
@@ -59,7 +60,11 @@ export default async function MensajerosPage({
   const activeAssignments = cleanRows.filter((r) => r.identTrabajador && !TERMINAL.has(r.estado));
   const violatingIds = directorio
     .filter((e) => e.vetado && e.vetadoProyectos.length > 0)
-    .filter((e) => activeAssignments.some((a) => a.identTrabajador === e.identTrabajador && e.vetadoProyectos.includes(a.proyecto)))
+    .filter((e) =>
+      activeAssignments.some(
+        (a) => a.identTrabajador === e.identTrabajador && e.vetadoProyectos.includes(a.proyecto) && esAsignacionPosteriorAlVeto(a, e.vetadoDesde)
+      )
+    )
     .map((e) => e.identTrabajador);
 
   return (
