@@ -5,9 +5,15 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { X, Trash2 } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
+import { bogotaToday } from '@/lib/date-filter';
 import { saveMensajero, deleteMensajero } from './actions';
 
 const TIPOS_VEHICULO = ['MOTORIZADO', 'CARRY'];
+
+function hoyStr(): string {
+  const t = bogotaToday();
+  return `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+}
 const SIN_IDENTIFICAR = 'SIN IDENTIFICAR';
 
 // "BOGOTÁ" vs "BOGOTA" son la misma ciudad — sin esto, un valor viejo
@@ -213,13 +219,32 @@ export default function DirectorioEditModal({
               <input
                 type="checkbox"
                 checked={form.vetado}
-                onChange={(e) => setForm({ ...form, vetado: e.target.checked })}
+                onChange={(e) => {
+                  const nextVetado = e.target.checked;
+                  setForm({
+                    ...form,
+                    vetado: nextVetado,
+                    vetadoDesde: nextVetado && !form.vetadoDesde ? hoyStr() : form.vetadoDesde,
+                  });
+                }}
                 className="h-4 w-4 accent-[var(--accent)]"
               />
               Vetado
             </label>
             {form.vetado && (
               <div className="mt-3 space-y-4">
+                <div>
+                  <label className={labelCls}>Vetado desde</label>
+                  <input
+                    type="date"
+                    value={form.vetadoDesde}
+                    onChange={(e) => setForm({ ...form, vetadoDesde: e.target.value })}
+                    className={`${inputCls} [color-scheme:dark] max-w-[200px]`}
+                  />
+                  <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
+                    Por defecto hoy — ajústela si el veto en realidad fue antes, para que la alerta de reasignación cuente bien.
+                  </p>
+                </div>
                 <div>
                   <label className={labelCls}>Proyecto(s) donde está vetado — puede marcar más de uno</label>
                   <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-2">

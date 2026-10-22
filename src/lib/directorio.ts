@@ -73,19 +73,11 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
 
   const pool = getPool();
 
-  // `vetado_desde` no se edita a mano — se calcula acá: si ya estaba
-  // vetado se conserva la fecha original (para que la alerta de
-  // reasignación no se "reinicie" cada vez que se edita otro campo), y si
-  // recién se está marcando vetado ahora, se estampa hoy.
-  let vetadoDesde: string | null = null;
-  if (entry.vetado) {
-    const before = await pool.query(
-      `select vetado, vetado_desde from public.directorio_mensajeros where ident_trabajador = $1`,
-      [ident]
-    );
-    const prev = before.rows[0];
-    vetadoDesde = prev?.vetado && prev.vetado_desde ? prev.vetado_desde : new Date().toISOString().slice(0, 10);
-  }
+  // `vetado_desde` ahora se edita en el formulario (por defecto hoy, ver
+  // directorio-edit-modal.tsx) — acá solo se valida: si quedó vetado sin
+  // fecha por alguna razón, se usa hoy como respaldo; si no está vetado,
+  // se limpia.
+  const vetadoDesde: string | null = entry.vetado ? entry.vetadoDesde || new Date().toISOString().slice(0, 10) : null;
 
   // Siempre en mayúsculas — el desplegable ya manda valores en mayúsculas,
   // esto es solo para no dejar pasar algo distinto si cambia el origen.
