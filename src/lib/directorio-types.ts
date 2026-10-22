@@ -16,6 +16,11 @@ export type DirectorioEntry = {
   contratadoFijo: boolean;
   contratadoFijoProyecto: string;
   notas: string;
+  // Ciudad/vehículo escritos a mano en Novedades — se usan cuando no hay
+  // suficiente historial de servicios para calcularlos solos (ver
+  // directorio/page.tsx: tienen prioridad sobre la moda calculada).
+  ciudadManual: string;
+  tipoVehiculoManual: string;
   actualizadoEn: string;
 };
 
@@ -32,6 +37,8 @@ export function emptyDirectorioEntry(identTrabajador = '', nombreTrabajador = ''
     contratadoFijo: false,
     contratadoFijoProyecto: '',
     notas: '',
+    ciudadManual: '',
+    tipoVehiculoManual: '',
     actualizadoEn: '',
   };
 }

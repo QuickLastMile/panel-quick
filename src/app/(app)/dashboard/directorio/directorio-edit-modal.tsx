@@ -132,6 +132,30 @@ export default function DirectorioEditModal({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Ciudad (manual)</label>
+              <input
+                value={form.ciudadManual}
+                onChange={(e) => setForm({ ...form, ciudadManual: e.target.value })}
+                className={inputCls}
+                placeholder="Ej: Bogotá"
+              />
+              <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
+                Solo hace falta si no se puede calcular sola del historial de servicios (ej. vetados de antes de septiembre 2026).
+              </p>
+            </div>
+            <div>
+              <label className={labelCls}>Vehículo (manual)</label>
+              <input
+                value={form.tipoVehiculoManual}
+                onChange={(e) => setForm({ ...form, tipoVehiculoManual: e.target.value })}
+                className={inputCls}
+                placeholder="Ej: Motorizado"
+              />
+            </div>
+          </div>
+
           <div className="rounded-lg border border-[var(--border)] p-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
               <input

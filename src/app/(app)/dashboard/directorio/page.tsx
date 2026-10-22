@@ -60,8 +60,12 @@ export default async function DirectorioPage() {
     .map((e) => ({
       ...e,
       nombreTrabajador: e.nombreTrabajador || seenNames.get(e.identTrabajador) || e.identTrabajador,
-      ciudad: moda(ciudadCounts.get(e.identTrabajador)),
-      tipoVehiculo: moda(vehiculoCounts.get(e.identTrabajador)),
+      // Manual (escrito en Novedades) gana sobre lo calculado del
+      // historial de servicios — para los casos sin servicios recientes
+      // donde no hay nada que calcular (ver conversación: solo hay
+      // servicios desde septiembre 2026, varios vetados son de antes).
+      ciudad: e.ciudadManual || moda(ciudadCounts.get(e.identTrabajador)),
+      tipoVehiculo: e.tipoVehiculoManual || moda(vehiculoCounts.get(e.identTrabajador)),
     }))
     .sort((a, b) => a.nombreTrabajador.localeCompare(b.nombreTrabajador, 'es'));
 

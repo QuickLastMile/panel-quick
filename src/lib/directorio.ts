@@ -43,6 +43,8 @@ function rowToEntry(r: Record<string, unknown>): DirectorioEntry {
     contratadoFijo: Boolean(r.contratado_fijo),
     contratadoFijoProyecto: s(r.contratado_fijo_proyecto),
     notas: s(r.notas),
+    ciudadManual: s(r.ciudad_manual),
+    tipoVehiculoManual: s(r.tipo_vehiculo_manual),
     actualizadoEn: r.actualizado_en ? new Date(r.actualizado_en as string).toISOString() : '',
   };
 }
@@ -87,8 +89,8 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
 
   await pool.query(
     `insert into public.directorio_mensajeros
-       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, vetado_desde, contratado_fijo, contratado_fijo_proyecto, notas, actualizado_en)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+       (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, vetado_desde, contratado_fijo, contratado_fijo_proyecto, notas, ciudad_manual, tipo_vehiculo_manual, actualizado_en)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
      on conflict (ident_trabajador) do update set
        nombre_trabajador = excluded.nombre_trabajador,
        telefono = excluded.telefono,
@@ -100,6 +102,8 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
        contratado_fijo = excluded.contratado_fijo,
        contratado_fijo_proyecto = excluded.contratado_fijo_proyecto,
        notas = excluded.notas,
+       ciudad_manual = excluded.ciudad_manual,
+       tipo_vehiculo_manual = excluded.tipo_vehiculo_manual,
        actualizado_en = now()`,
     [
       ident,
@@ -113,6 +117,8 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
       entry.contratadoFijo,
       entry.contratadoFijoProyecto,
       entry.notas,
+      entry.ciudadManual,
+      entry.tipoVehiculoManual,
     ]
   );
   cached = null;
