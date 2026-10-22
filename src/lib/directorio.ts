@@ -128,3 +128,12 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
   );
   cached = null;
 }
+
+// Borra por completo el registro de Novedades de este mensajero (vetado,
+// contratado fijo, notas, todo) — para cuando se registró por error.
+export async function deleteDirectorioEntry(identTrabajador: string): Promise<void> {
+  const ident = identTrabajador.trim();
+  if (!ident) throw new Error('Falta la identificación del trabajador.');
+  await getPool().query(`delete from public.directorio_mensajeros where ident_trabajador = $1`, [ident]);
+  cached = null;
+}

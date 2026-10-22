@@ -145,14 +145,42 @@ export function listProyectos(rows: ServiceRow[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
+// bi_smart manda las ciudades sin tilde (BOGOTA, MEDELLIN...) — se corrige
+// acá solo para mostrar, con la ortografía correcta en español. Solo las
+// que de verdad llevan tilde (no todo nombre propio la necesita).
+const CIUDAD_CON_TILDE: Record<string, string> = {
+  BOGOTA: 'BOGOTÁ',
+  MEDELLIN: 'MEDELLÍN',
+  CHIA: 'CHÍA',
+  POPAYAN: 'POPAYÁN',
+  CUCUTA: 'CÚCUTA',
+  IBAGUE: 'IBAGUÉ',
+  FUSAGASUGA: 'FUSAGASUGÁ',
+  FACATATIVA: 'FACATATIVÁ',
+  ZIPAQUIRA: 'ZIPAQUIRÁ',
+  CAJICA: 'CAJICÁ',
+  MONTERIA: 'MONTERÍA',
+  TULUA: 'TULUÁ',
+  GARZON: 'GARZÓN',
+  GIRON: 'GIRÓN',
+  ITAGUI: 'ITAGÜÍ',
+  JAMUNDI: 'JAMUNDÍ',
+  TOCANCIPA: 'TOCANCIPÁ',
+  GACHANCIPA: 'GACHANCIPÁ',
+  SOPO: 'SOPÓ',
+  'CIUDAD DE MEXICO': 'CIUDAD DE MÉXICO',
+  'ESTADO DE MEXICO': 'ESTADO DE MÉXICO',
+  'PUERTO LOPEZ': 'PUERTO LÓPEZ',
+  MALAGA: 'MÁLAGA',
+};
+
 // Ciudades reales vistas en el histórico de servicios — para el
-// desplegable de "Ciudad (manual)" en Novedades. Ya vienen en mayúsculas
-// desde el origen (bi_smart).
+// desplegable de "Ciudad (manual)" en Novedades.
 export function listCiudades(rows: ServiceRow[]): string[] {
   const set = new Set<string>();
   rows.forEach((r) => {
-    const c = r.ciudad.trim();
-    if (c) set.add(c.toUpperCase());
+    const c = r.ciudad.trim().toUpperCase();
+    if (c) set.add(CIUDAD_CON_TILDE[c] || c);
   });
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }

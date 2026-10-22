@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
-import { saveMensajero } from './actions';
+import { saveMensajero, deleteMensajero } from './actions';
 
 const TIPOS_VEHICULO = ['MOTORIZADO', 'CARRY'];
+const SIN_IDENTIFICAR = 'SIN IDENTIFICAR';
 
 // "BOGOTÁ" vs "BOGOTA" son la misma ciudad — sin esto, un valor viejo
 // escrito con tilde (de cuando el campo era texto libre) no calzaba con
@@ -33,11 +34,14 @@ export default function DirectorioEditModal({
   const [form, setForm] = useState<DirectorioEntry | null>(entry);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     setForm(entry);
     setError('');
+    setConfirmingDelete(false);
   }, [entry]);
 
   useEffect(() => {
@@ -62,8 +66,6 @@ export default function DirectorioEditModal({
   // Un valor manual viejo escrito con tilde ("BOGOTÁ") calza igual con la
   // opción sin tilde del desplegable ("BOGOTA") — se resuelve solo, sin
   // pedirle a la usuaria que lo vuelva a escribir.
-  const ciudadResuelta = ciudades.find((c) => normalizar(c) === normalizar(form.ciudadManual));
-  const ciudadSelectValue = form.ciudadManual ? ciudadResuelta ?? form.ciudadManual : '';
   const vehiculoResuelto = TIPOS_VEHICULO.find((v) => normalizar(v) === normalizar(form.tipoVehiculoManual));
   const vehiculoSelectValue = form.tipoVehiculoManual ? vehiculoResuelto ?? form.tipoVehiculoManual : '';
 
@@ -80,6 +82,20 @@ export default function DirectorioEditModal({
     setError('');
     const res = await saveMensajero(form);
     setSaving(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    router.refresh();
+    onClose();
+  }
+
+  async function handleDelete() {
+    if (!entry) return;
+    setDeleting(true);
+    setError('');
+    const res = await deleteMensajero(entry.identTrabajador);
+    setDeleting(false);
     if (res.error) {
       setError(res.error);
       return;
@@ -155,23 +171,21 @@ export default function DirectorioEditModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Ciudad (manual)</label>
-              <select
-                value={ciudadSelectValue}
-                onChange={(e) => setForm({ ...form, ciudadManual: e.target.value })}
+              <input
+                list="ciudades-datalist"
+                value={form.ciudadManual}
+                onChange={(e) => setForm({ ...form, ciudadManual: e.target.value.toUpperCase() })}
                 className={inputCls}
-              >
-                <option value="">— Sin especificar —</option>
+                placeholder="Escriba para buscar…"
+              />
+              <datalist id="ciudades-datalist">
                 {ciudades.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
+                  <option key={c} value={c} />
                 ))}
-                {form.ciudadManual && !ciudadResuelta && (
-                  <option value={form.ciudadManual}>{form.ciudadManual} (valor antiguo)</option>
-                )}
-              </select>
+              </datalist>
               <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
-                Solo hace falta si no se puede calcular sola del historial de servicios (ej. vetados de antes de septiembre 2026).
+                Empiece a escribir y elija de las sugerencias — solo hace falta si no se puede calcular sola del historial de servicios
+                (ej. vetados de antes de septiembre 2026).
               </p>
             </div>
             <div>
@@ -209,6 +223,22 @@ export default function DirectorioEditModal({
                 <div>
                   <label className={labelCls}>Proyecto(s) donde está vetado — puede marcar más de uno</label>
                   <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-2">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md border-b border-[var(--border)] px-1.5 py-1 pb-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                      <input
+                        type="checkbox"
+                        checked={form.vetadoProyectos.includes(SIN_IDENTIFICAR)}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            vetadoProyectos: e.target.checked
+                              ? [...form.vetadoProyectos, SIN_IDENTIFICAR]
+                              : form.vetadoProyectos.filter((x) => x !== SIN_IDENTIFICAR),
+                          })
+                        }
+                        className="h-3.5 w-3.5 accent-[var(--accent)]"
+                      />
+                      {SIN_IDENTIFICAR} — no se sabe de cuál proyecto exactamente
+                    </label>
                     {proyectos.length === 0 ? (
                       <p className="px-1 py-1 text-xs text-[var(--text-muted)]">No hay proyectos activos para elegir.</p>
                     ) : (
@@ -235,7 +265,7 @@ export default function DirectorioEditModal({
                         coinciden con ningún proyecto activo — no aparecen en la lista de
                         arriba, así que sin esto no había forma de desmarcarlos. */}
                     {form.vetadoProyectos
-                      .filter((p) => !proyectos.includes(p))
+                      .filter((p) => p !== SIN_IDENTIFICAR && !proyectos.includes(p))
                       .map((p) => (
                         <label
                           key={p}
@@ -301,21 +331,56 @@ export default function DirectorioEditModal({
           {error && <p className="rounded-lg border border-red-900/40 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</p>}
         </form>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] p-4">
-          <button
-            onClick={onClose}
-            type="button"
-            className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)]"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="rounded-lg bg-gradient-gold px-4 py-2 text-sm font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
-          >
-            {saving ? 'Guardando…' : 'Guardar'}
-          </button>
+        <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] p-4">
+          {!isNew && (
+            <div className="flex items-center gap-2">
+              {confirmingDelete ? (
+                <>
+                  <span className="text-xs font-semibold text-red-400">¿Eliminar toda la novedad de {entry.nombreTrabajador}?</span>
+                  <button
+                    onClick={handleDelete}
+                    type="button"
+                    disabled={deleting}
+                    className="rounded-lg bg-red-500/20 px-3 py-2 text-xs font-bold text-red-400 transition-colors hover:bg-red-500/30 disabled:opacity-60"
+                  >
+                    {deleting ? 'Eliminando…' : 'Sí, eliminar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    type="button"
+                    className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)]"
+                  >
+                    No
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-red-400 transition-colors hover:border-red-900/50 hover:bg-red-500/10"
+                >
+                  <Trash2 size={13} />
+                  Eliminar
+                </button>
+              )}
+            </div>
+          )}
+          <div className={`flex items-center gap-2 ${isNew ? 'ml-auto' : ''}`}>
+            <button
+              onClick={onClose}
+              type="button"
+              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:border-[var(--border-strong)]"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="rounded-lg bg-gradient-gold px-4 py-2 text-sm font-bold text-[#141008] transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
         </div>
       </div>
     </>,
