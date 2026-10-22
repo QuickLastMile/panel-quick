@@ -8,7 +8,7 @@ import type { DirectorioEntry } from '@/lib/directorio-types';
 import { bogotaToday } from '@/lib/date-filter';
 import { saveMensajero, deleteMensajero } from './actions';
 
-const TIPOS_VEHICULO = ['MOTORIZADO', 'CARRY'];
+const TIPOS_VEHICULO = ['MOTORIZADO', 'CARRY', 'BICI'];
 
 function hoyStr(): string {
   const t = bogotaToday();
