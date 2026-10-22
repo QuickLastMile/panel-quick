@@ -169,14 +169,26 @@ export default function DirectorioEditModal({
                         </label>
                       ))
                     )}
+                    {/* Valores viejos (texto libre, de antes del desplegable) que ya no
+                        coinciden con ningún proyecto activo — no aparecen en la lista de
+                        arriba, así que sin esto no había forma de desmarcarlos. */}
+                    {form.vetadoProyectos
+                      .filter((p) => !proyectos.includes(p))
+                      .map((p) => (
+                        <label
+                          key={p}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border-t border-[var(--border)] px-1.5 py-1 pt-1.5 text-xs text-amber-400 hover:bg-[var(--surface-hover)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={() => setForm({ ...form, vetadoProyectos: form.vetadoProyectos.filter((x) => x !== p) })}
+                            className="h-3.5 w-3.5 accent-amber-500"
+                          />
+                          {p} (valor antiguo, sin coincidencia — desmárquelo y marque el proyecto correcto de arriba)
+                        </label>
+                      ))}
                   </div>
-                  {form.vetadoProyectos.some((p) => !proyectos.includes(p)) && (
-                    <p className="mt-1.5 text-[11px] text-amber-400">
-                      Valor antiguo sin coincidencia exacta con un proyecto activo:{' '}
-                      {form.vetadoProyectos.filter((p) => !proyectos.includes(p)).join(', ')} — vuelva a marcar el/los proyecto(s)
-                      correcto(s) de la lista de arriba para que la alerta de reasignación funcione.
-                    </p>
-                  )}
                 </div>
                 <div>
                   <label className={labelCls}>Motivo</label>

@@ -18,11 +18,38 @@ export default async function DirectorioPage() {
   const directorio = await getDirectorio();
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
 
-  // Nombre más reciente visto por cada Ident. Trabajador en los datos reales.
+  // Nombre más reciente visto por cada Ident. Trabajador en los datos reales,
+  // y moda de ciudad/tipo de vehículo — para mostrarlos en Novedades sin
+  // tener que ir a buscarlos servicio por servicio.
   const seenNames = new Map<string, string>();
+  const ciudadCounts = new Map<string, Map<string, number>>();
+  const vehiculoCounts = new Map<string, Map<string, number>>();
   allRows.forEach((r) => {
-    if (r.identTrabajador) seenNames.set(r.identTrabajador, r.nombreTrabajador || seenNames.get(r.identTrabajador) || r.identTrabajador);
+    if (!r.identTrabajador) return;
+    seenNames.set(r.identTrabajador, r.nombreTrabajador || seenNames.get(r.identTrabajador) || r.identTrabajador);
+    if (r.ciudad) {
+      if (!ciudadCounts.has(r.identTrabajador)) ciudadCounts.set(r.identTrabajador, new Map());
+      const m = ciudadCounts.get(r.identTrabajador)!;
+      m.set(r.ciudad, (m.get(r.ciudad) || 0) + 1);
+    }
+    if (r.tipoVehiculo) {
+      if (!vehiculoCounts.has(r.identTrabajador)) vehiculoCounts.set(r.identTrabajador, new Map());
+      const m = vehiculoCounts.get(r.identTrabajador)!;
+      m.set(r.tipoVehiculo, (m.get(r.tipoVehiculo) || 0) + 1);
+    }
   });
+  function moda(counts: Map<string, number> | undefined): string {
+    if (!counts) return '';
+    let best = '';
+    let bestCount = 0;
+    for (const [k, v] of counts) {
+      if (v > bestCount) {
+        best = k;
+        bestCount = v;
+      }
+    }
+    return best;
+  }
 
   // El directorio NO es un roster de todo mensajero que haya pasado por acá
   // (con tanta rotación tipo DiDi/Picap, eso sería una lista gigante e
@@ -30,7 +57,12 @@ export default async function DirectorioPage() {
   // contratados fijos, o con alguna novedad anotada.
   const entries = directorio
     .filter((e) => e.vetado || e.contratadoFijo || e.notas.trim() !== '')
-    .map((e) => ({ ...e, nombreTrabajador: e.nombreTrabajador || seenNames.get(e.identTrabajador) || e.identTrabajador }))
+    .map((e) => ({
+      ...e,
+      nombreTrabajador: e.nombreTrabajador || seenNames.get(e.identTrabajador) || e.identTrabajador,
+      ciudad: moda(ciudadCounts.get(e.identTrabajador)),
+      tipoVehiculo: moda(vehiculoCounts.get(e.identTrabajador)),
+    }))
     .sort((a, b) => a.nombreTrabajador.localeCompare(b.nombreTrabajador, 'es'));
 
   // Asignaciones activas (no cerradas) — para detectar mensajeros marcados
