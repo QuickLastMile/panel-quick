@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 
+// Centinela para "ninguno seleccionado a propósito" — sin esto, una lista
+// vacía es indistinguible de "sin filtro en la URL" (que ya significa
+// "todos"), así que no había forma de representar "ninguno" para poder
+// marcar uno solo sin desmarcar todo lo demás a mano.
+const NINGUNO = '__NINGUNO__';
+
 export default function ProyectoFilter({ proyectos, selected }: { proyectos: string[]; selected: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -21,29 +27,38 @@ export default function ProyectoFilter({ proyectos, selected }: { proyectos: str
 
   if (!proyectos.length) return null;
 
+  const esNinguno = selected.length === 1 && selected[0] === NINGUNO;
   // `selected` vacío (sin param en la URL) = predeterminado "todos
   // seleccionados" — se muestra así (checkboxes marcados), no como "ninguno".
-  const effectiveSelected = selected.length === 0 ? proyectos : selected;
+  const effectiveSelected = esNinguno ? [] : selected.length === 0 ? proyectos : selected;
   const allSelected = effectiveSelected.length === proyectos.length;
 
   function apply(next: string[]) {
     const params = new URLSearchParams(searchParams.toString());
-    // Si queda todo marcado, se limpia el param — mismo estado implícito
-    // "todos" con el que arranca la página, URL más corta.
-    if (next.length && next.length < proyectos.length) params.set('proyecto', next.join(','));
-    else params.delete('proyecto');
+    if (next.length === 1 && next[0] === NINGUNO) {
+      params.set('proyecto', NINGUNO);
+    } else if (next.length && next.length < proyectos.length) {
+      params.set('proyecto', next.join(','));
+    } else {
+      // Vacío o todos marcados = mismo estado implícito "todos" con el que
+      // arranca la página, URL más corta.
+      params.delete('proyecto');
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 
   function toggle(p: string) {
-    apply(effectiveSelected.includes(p) ? effectiveSelected.filter((x) => x !== p) : [...effectiveSelected, p]);
+    const next = effectiveSelected.includes(p) ? effectiveSelected.filter((x) => x !== p) : [...effectiveSelected, p];
+    apply(next.length ? next : [NINGUNO]);
   }
 
-  const label = allSelected
-    ? 'Todos los proyectos'
-    : effectiveSelected.length === 1
-      ? effectiveSelected[0]
-      : `${effectiveSelected.length} proyectos`;
+  const label = esNinguno
+    ? 'Ninguno seleccionado'
+    : allSelected
+      ? 'Todos los proyectos'
+      : effectiveSelected.length === 1
+        ? effectiveSelected[0]
+        : `${effectiveSelected.length} proyectos`;
 
   return (
     <div ref={ref} className="relative mb-5 inline-block">
@@ -61,11 +76,21 @@ export default function ProyectoFilter({ proyectos, selected }: { proyectos: str
             <span className="text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
               {effectiveSelected.length} seleccionado{effectiveSelected.length === 1 ? '' : 's'}
             </span>
-            {!allSelected && (
-              <button onClick={() => apply([])} className="text-[11px] font-semibold text-[var(--accent-bright)] hover:underline">
-                Seleccionar todos
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!allSelected && (
+                <button onClick={() => apply([])} className="text-[11px] font-semibold text-[var(--accent-bright)] hover:underline">
+                  Todos
+                </button>
+              )}
+              {!esNinguno && (
+                <button
+                  onClick={() => apply([NINGUNO])}
+                  className="text-[11px] font-semibold text-[var(--text-muted)] hover:underline"
+                >
+                  Ninguno
+                </button>
+              )}
+            </div>
           </div>
           {proyectos.map((p) => (
             <label
