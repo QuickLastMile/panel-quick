@@ -32,11 +32,13 @@ export default function DirectorioClient({
   entries,
   activeAssignments,
   proyectos,
+  ciudades,
   canEdit,
 }: {
   entries: NovedadEntry[];
   activeAssignments: ActiveAssignment[];
   proyectos: string[];
+  ciudades: string[];
   canEdit: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('lista');
@@ -365,7 +367,7 @@ export default function DirectorioClient({
         </>
       )}
 
-      {canEdit && <DirectorioEditModal entry={editing} proyectos={proyectos} onClose={() => setEditing(null)} />}
+      {canEdit && <DirectorioEditModal entry={editing} proyectos={proyectos} ciudades={ciudades} onClose={() => setEditing(null)} />}
     </div>
   );
 }

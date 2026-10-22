@@ -1,6 +1,6 @@
 import { getSheetsSnapshot } from '@/lib/sheets';
 import { getDirectorio } from '@/lib/directorio';
-import { isSinClasificar, listProyectos } from '@/lib/aggregate';
+import { isSinClasificar, listProyectos, listCiudades } from '@/lib/aggregate';
 import { formatBogotaDateTime } from '@/lib/date-filter';
 import { requireRole } from '@/lib/session';
 import PageHeader from '@/components/page-header';
@@ -82,6 +82,7 @@ export default async function DirectorioPage() {
       fechaSolicitud: r.fechaSolicitud,
     }));
   const proyectos = listProyectos(allRows);
+  const ciudades = listCiudades(allRows);
 
   return (
     <div>
@@ -91,7 +92,13 @@ export default async function DirectorioPage() {
         accent="mensajeros"
         asOf={`Última sincronización: ${syncLabel} · ${entries.length.toLocaleString('es-CO')} registrados`}
       />
-      <DirectorioClient entries={entries} activeAssignments={activeAssignments} proyectos={proyectos} canEdit={role === 'admin'} />
+      <DirectorioClient
+        entries={entries}
+        activeAssignments={activeAssignments}
+        proyectos={proyectos}
+        ciudades={ciudades}
+        canEdit={role === 'admin'}
+      />
     </div>
   );
 }

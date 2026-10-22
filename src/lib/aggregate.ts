@@ -145,6 +145,18 @@ export function listProyectos(rows: ServiceRow[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
+// Ciudades reales vistas en el histórico de servicios — para el
+// desplegable de "Ciudad (manual)" en Novedades. Ya vienen en mayúsculas
+// desde el origen (bi_smart).
+export function listCiudades(rows: ServiceRow[]): string[] {
+  const set = new Set<string>();
+  rows.forEach((r) => {
+    const c = r.ciudad.trim();
+    if (c) set.add(c.toUpperCase());
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
 // `proyectos` vacío = sin filtro (todos). Selección múltiple: cualquier
 // fila cuyo proyecto esté en la lista pasa.
 export function filterRowsByProyecto(rows: ServiceRow[], proyectos: string[]): ServiceRow[] {

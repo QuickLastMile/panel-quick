@@ -87,6 +87,11 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
     vetadoDesde = prev?.vetado && prev.vetado_desde ? prev.vetado_desde : new Date().toISOString().slice(0, 10);
   }
 
+  // Siempre en mayúsculas — el desplegable ya manda valores en mayúsculas,
+  // esto es solo para no dejar pasar algo distinto si cambia el origen.
+  const ciudadManual = entry.ciudadManual.trim().toUpperCase();
+  const tipoVehiculoManual = entry.tipoVehiculoManual.trim().toUpperCase();
+
   await pool.query(
     `insert into public.directorio_mensajeros
        (ident_trabajador, nombre_trabajador, telefono, estado, vetado, vetado_proyectos, vetado_motivo, vetado_desde, contratado_fijo, contratado_fijo_proyecto, notas, ciudad_manual, tipo_vehiculo_manual, actualizado_en)
@@ -117,8 +122,8 @@ export async function saveDirectorioEntry(entry: DirectorioEntry): Promise<void>
       entry.contratadoFijo,
       entry.contratadoFijoProyecto,
       entry.notas,
-      entry.ciudadManual,
-      entry.tipoVehiculoManual,
+      ciudadManual,
+      tipoVehiculoManual,
     ]
   );
   cached = null;

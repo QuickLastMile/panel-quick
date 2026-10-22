@@ -7,13 +7,25 @@ import { X } from 'lucide-react';
 import type { DirectorioEntry } from '@/lib/directorio-types';
 import { saveMensajero } from './actions';
 
+const TIPOS_VEHICULO = ['MOTORIZADO', 'CARRY'];
+
+// "BOGOTÁ" vs "BOGOTA" son la misma ciudad — sin esto, un valor viejo
+// escrito con tilde (de cuando el campo era texto libre) no calzaba con
+// ninguna opción del desplegable (que viene sin tildes, del origen).
+const DIACRITICOS = /[̀-ͯ]/g;
+function normalizar(s: string): string {
+  return s.normalize('NFD').replace(DIACRITICOS, '').toUpperCase().trim();
+}
+
 export default function DirectorioEditModal({
   entry,
   proyectos,
+  ciudades,
   onClose,
 }: {
   entry: DirectorioEntry | null;
   proyectos: string[];
+  ciudades: string[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -46,6 +58,14 @@ export default function DirectorioEditModal({
   }, [entry, onClose]);
 
   if (!entry || !form || !mounted) return null;
+
+  // Un valor manual viejo escrito con tilde ("BOGOTÁ") calza igual con la
+  // opción sin tilde del desplegable ("BOGOTA") — se resuelve solo, sin
+  // pedirle a la usuaria que lo vuelva a escribir.
+  const ciudadResuelta = ciudades.find((c) => normalizar(c) === normalizar(form.ciudadManual));
+  const ciudadSelectValue = form.ciudadManual ? ciudadResuelta ?? form.ciudadManual : '';
+  const vehiculoResuelto = TIPOS_VEHICULO.find((v) => normalizar(v) === normalizar(form.tipoVehiculoManual));
+  const vehiculoSelectValue = form.tipoVehiculoManual ? vehiculoResuelto ?? form.tipoVehiculoManual : '';
 
   const isNew = !entry.identTrabajador;
 
@@ -135,24 +155,42 @@ export default function DirectorioEditModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Ciudad (manual)</label>
-              <input
-                value={form.ciudadManual}
+              <select
+                value={ciudadSelectValue}
                 onChange={(e) => setForm({ ...form, ciudadManual: e.target.value })}
                 className={inputCls}
-                placeholder="Ej: Bogotá"
-              />
+              >
+                <option value="">— Sin especificar —</option>
+                {ciudades.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                {form.ciudadManual && !ciudadResuelta && (
+                  <option value={form.ciudadManual}>{form.ciudadManual} (valor antiguo)</option>
+                )}
+              </select>
               <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
                 Solo hace falta si no se puede calcular sola del historial de servicios (ej. vetados de antes de septiembre 2026).
               </p>
             </div>
             <div>
               <label className={labelCls}>Vehículo (manual)</label>
-              <input
-                value={form.tipoVehiculoManual}
+              <select
+                value={vehiculoSelectValue}
                 onChange={(e) => setForm({ ...form, tipoVehiculoManual: e.target.value })}
                 className={inputCls}
-                placeholder="Ej: Motorizado"
-              />
+              >
+                <option value="">— Sin especificar —</option>
+                {TIPOS_VEHICULO.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+                {form.tipoVehiculoManual && !vehiculoResuelto && (
+                  <option value={form.tipoVehiculoManual}>{form.tipoVehiculoManual} (valor antiguo)</option>
+                )}
+              </select>
             </div>
           </div>
 
