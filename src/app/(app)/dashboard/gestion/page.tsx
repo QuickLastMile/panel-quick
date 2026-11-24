@@ -21,6 +21,14 @@ export default async function GestionPage({
   // Excluye "OTRO"/"OTROS"/"NN" — son proyectos sin clasificar, no reales.
   const rows = filterRowsByDate(allRows, filter).filter((r) => !isSinClasificar(r.proyecto));
   const syncLabel = lastSyncedAt ? formatBogotaDateTime(lastSyncedAt) : 'sin sincronizar aún';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ymd = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
+  const exportFileName =
+    filter.mode === 'month'
+      ? `servicios_${filter.year}-${pad(filter.month)}`
+      : filter.mode === 'range'
+        ? `servicios_${ymd(filter.year, filter.month, filter.day)}_a_${ymd(filter.endYear ?? filter.year, filter.endMonth ?? filter.month, filter.endDay ?? filter.day)}`
+        : `servicios_${ymd(filter.year, filter.month, filter.day)}`;
 
   return (
     <div>
@@ -31,7 +39,7 @@ export default async function GestionPage({
         asOf={`Última sincronización: ${syncLabel}`}
       />
       <DateFilterBar filter={filter} />
-      <GestionClient rows={rows} />
+      <GestionClient rows={rows} exportFileName={exportFileName} />
     </div>
   );
 }

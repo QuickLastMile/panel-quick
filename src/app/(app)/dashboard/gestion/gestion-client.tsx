@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { SlidersHorizontal, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { downloadServiciosExcel } from '@/lib/export-servicios';
+import { parseFechaSolicitud } from '@/lib/date-filter';
 import type { ServiceRow } from '@/lib/sheets';
 import StatusPill from '@/components/status-pill';
 import ServiceDetailPanel from '@/components/service-detail-panel';
@@ -94,8 +96,9 @@ function distinct(rows: ServiceRow[], key: keyof ServiceRow, excludeSinClasifica
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
+export default function GestionClient({ rows, exportFileName }: { rows: ServiceRow[]; exportFileName: string }) {
   const [group, setGroup] = useState<string>('En Espera');
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<{ col: keyof ServiceRow; dir: 'asc' | 'desc' }>({ col: 'fechaSolicitud', dir: 'desc' });
   const [page, setPage] = useState(0);
@@ -213,6 +216,28 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
     setPage(0);
   }
 
+  // Exporta TODOS los estados del rango de fechas (no solo la pestaña
+  // abierta), respetando los filtros de proyecto/jefatura/etc.
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      // fechaSolicitud es "D/M/AAAA": ordenar el texto no da orden de fecha.
+      const key = (r: ServiceRow) => {
+        const f = parseFechaSolicitud(r.fechaSolicitud);
+        return f ? f.year * 10000 + f.month * 100 + f.day : 0;
+      };
+      const sorted = filteredRows
+        .slice()
+        .sort((a, b) => key(a) - key(b) || String(a.horaServicio).localeCompare(String(b.horaServicio)));
+      await downloadServiciosExcel(sorted, exportFileName);
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo generar el Excel. Intenta de nuevo.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -236,6 +261,14 @@ export default function GestionClient({ rows }: { rows: ServiceRow[] }) {
             Limpiar filtros
           </button>
         )}
+        <button
+          onClick={exportExcel}
+          disabled={exporting || filteredRows.length === 0}
+          className="ml-auto flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-bold text-[var(--text-secondary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-bright)] disabled:opacity-40"
+        >
+          <Download size={13} />
+          {exporting ? 'Generando…' : `Exportar Excel (${filteredRows.length.toLocaleString('es-CO')})`}
+        </button>
       </div>
 
       {showFilters && (
