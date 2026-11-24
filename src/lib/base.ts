@@ -97,16 +97,22 @@ export async function saveProyectoBaseRow(
 
   const pool = getPool();
 
-  if (originalEmail) {
-    const before = (await pool.query(`select nombre, proceso, jefatura from public.base_proyecto where email = $1`, [originalEmail])).rows[0];
+  // "Especificar" desde No especificados llega con originalEmail aunque el
+  // correo todavía NO esté en BASE — si no hay fila que editar, se crea
+  // (antes el UPDATE afectaba 0 filas y volvía "ok" sin guardar nada).
+  const before = originalEmail
+    ? (await pool.query(`select nombre, proceso, jefatura from public.base_proyecto where email = $1`, [originalEmail])).rows[0]
+    : undefined;
+
+  if (before) {
     await pool.query(
       `update public.base_proyecto set email = $1, nombre = $2, proceso = $3, jefatura = $4 where email = $5`,
       [email, nombre, proceso, jefatura, originalEmail]
     );
     const campos: [string, string, string][] = [
-      ['Nombre', before?.nombre || '', nombre],
-      ['Proyecto', before?.proceso || '', proceso],
-      ['Jefatura', before?.jefatura || '', jefatura],
+      ['Nombre', before.nombre || '', nombre],
+      ['Proyecto', before.proceso || '', proceso],
+      ['Jefatura', before.jefatura || '', jefatura],
     ];
     for (const [campo, antes, despues] of campos) {
       if (antes !== despues) {
@@ -145,18 +151,22 @@ export async function saveColaboradorBaseRow(
 
   const pool = getPool();
 
-  if (originalColaboradorData) {
-    const before = (
-      await pool.query(`select cargo, ext, colaborador from public.base_colaborador where colaborador_data = $1`, [originalColaboradorData])
-    ).rows[0];
+  // Mismo caso que en saveProyectoBaseRow: "Especificar" trae la clave
+  // aunque todavía no exista en BASE — sin fila previa, se crea.
+  const before = originalColaboradorData
+    ? (await pool.query(`select cargo, ext, colaborador from public.base_colaborador where colaborador_data = $1`, [originalColaboradorData]))
+        .rows[0]
+    : undefined;
+
+  if (before) {
     await pool.query(
       `update public.base_colaborador set colaborador_data = $1, cargo = $2, ext = $3, colaborador = $4 where colaborador_data = $5`,
       [colaboradorData, cargo, ext, colaborador, originalColaboradorData]
     );
     const campos: [string, string, string][] = [
-      ['Cargo', before?.cargo || '', cargo],
-      ['Extensión', before?.ext || '', ext],
-      ['Nombre del colaborador', before?.colaborador || '', colaborador],
+      ['Cargo', before.cargo || '', cargo],
+      ['Extensión', before.ext || '', ext],
+      ['Nombre del colaborador', before.colaborador || '', colaborador],
     ];
     for (const [campo, antes, despues] of campos) {
       if (antes !== despues) {

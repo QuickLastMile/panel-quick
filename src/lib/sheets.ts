@@ -142,10 +142,15 @@ const toNum = (v: unknown): number | null => {
 };
 const toStr = (v: unknown): string => (v === null || v === undefined ? '' : String(v));
 
-async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
+type RawServices = { rows: Record<string, unknown>[]; lastSyncedAt: string | null };
+
+// Solo la consulta pesada (public.services) — sin cruzar contra BASE, para
+// que esto sí se pueda cachear sin que un cambio en Configuración > BASE
+// quede escondido hasta que venza el caché (ver getSheetsSnapshot).
+async function fetchRawServicesUncached(): Promise<RawServices> {
   const db = getPool();
 
-  const [dataRes, syncRes, colaboradorRows, proyectoRows] = await Promise.all([
+  const [dataRes, syncRes] = await Promise.all([
     db.query(
       `SELECT id, estado, ciudad, direccion,
               nombre_trabajador, ident_trabajador, placa, razon_cancelacion,
@@ -158,11 +163,18 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
        FROM public.services`
     ),
     db.query(`SELECT max(updated_at) AS last FROM public.services`),
-    getColaboradorBaseRows(),
-    getProyectoBaseRows(),
   ]);
 
   const lastSyncedAt = syncRes.rows[0]?.last ? new Date(syncRes.rows[0].last).toISOString() : null;
+  return { rows: dataRes.rows, lastSyncedAt };
+}
+
+function buildSnapshot(
+  raw: RawServices,
+  colaboradorRows: Awaited<ReturnType<typeof getColaboradorBaseRows>>,
+  proyectoRows: Awaited<ReturnType<typeof getProyectoBaseRows>>
+): SheetsSnapshot {
+  const { lastSyncedAt } = raw;
 
   // PROYECTO/JEFATURA/GESTOR/CARGO GESTOR/TIPO ASIGNADOR ya no vienen de
   // fórmulas de Sheets (VLOOKUP contra la hoja BASE) — se resuelven acá,
@@ -200,7 +212,7 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
   const proyectoFor = (email: string): string => proyectoPorEmail.get(normKey(email))?.proceso || 'OTRO';
   const jefaturaFor = (email: string): string => proyectoPorEmail.get(normKey(email))?.jefatura || 'nn';
 
-  const rows: ServiceRow[] = dataRes.rows
+  const rows: ServiceRow[] = raw.rows
     .map((r) => {
       const usuarioAsignacion = toStr(r.usuario_asignacion);
       const usuarioCancelacion = toStr(r.usuario_cancelacion);
@@ -260,12 +272,23 @@ async function fetchSnapshotUncached(): Promise<SheetsSnapshot> {
 // nada obsoleto que no lo fuera igual con 90s, pero sí evita repetir la
 // consulta lenta en cada clic — vive por instancia de función (Vercel
 // puede reusar una instancia "caliente" entre pedidos cercanos).
-let cached: { data: SheetsSnapshot; expiresAt: number } | null = null;
+//
+// Lo que se cachea es solo public.services en crudo: el cruce con BASE
+// (PROYECTO/JEFATURA/GESTOR/...) se rehace en cada llamada con BASE leída
+// en el momento — son dos tablas chicas, y así lo que se especifica en
+// Configuración > BASE se ve de inmediato en todas las páginas (antes
+// quedaba escondido hasta 8 min y parecía que "no guardaba").
+let cached: { data: RawServices; expiresAt: number } | null = null;
 const CACHE_TTL_MS = 8 * 60_000;
 
 export async function getSheetsSnapshot(): Promise<SheetsSnapshot> {
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
-  const data = await fetchSnapshotUncached();
-  cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
-  return data;
+  const rawPromise =
+    cached && cached.expiresAt > Date.now()
+      ? Promise.resolve(cached.data)
+      : fetchRawServicesUncached().then((data) => {
+          cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+          return data;
+        });
+  const [raw, colaboradorRows, proyectoRows] = await Promise.all([rawPromise, getColaboradorBaseRows(), getProyectoBaseRows()]);
+  return buildSnapshot(raw, colaboradorRows, proyectoRows);
 }

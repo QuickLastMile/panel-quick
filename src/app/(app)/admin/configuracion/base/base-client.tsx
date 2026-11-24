@@ -102,6 +102,11 @@ function ProyectoForm({
       setError('Ingresa un correo válido.');
       return;
     }
+    // Sin Jefatura el cruce cae en "nn" y el correo sigue en No especificados.
+    if (!proceso.trim() || !jefatura.trim()) {
+      setError('Proyecto y Jefatura son obligatorios para que el correo quede especificado.');
+      return;
+    }
     setSaving(true);
     setError('');
     const res = await saveProyecto({ originalEmail: initial.email, email, nombre, proceso, jefatura });
