@@ -22,6 +22,7 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/directorio',
     '/dashboard/onboarding',
     '/dashboard/onboarding/registro',
+    '/dashboard/backoffice',
     '/admin/configuracion',
     '/admin/configuracion/base',
     '/admin/configuracion/historial',
@@ -38,13 +39,14 @@ export const ROLE_ALLOWED_PATHS: Record<Role, string[]> = {
     '/dashboard/mensajeros',
     '/dashboard/directorio',
     '/dashboard/onboarding',
+    '/dashboard/backoffice',
   ],
   // Rol restringido: solo la pestaña Gestión.
   coordinador: ['/dashboard/gestion'],
   // Rol restringido: su área de trabajo (registrar/editar colaboradores) +
-  // el tablero de indicadores de Onboarding — no ve el resto del panel ni
-  // Configuración.
-  onboarding: ['/dashboard/onboarding/registro', '/dashboard/onboarding'],
+  // el tablero de indicadores de Onboarding + BackOffice (sube sus archivos
+  // de ajuste) — no ve el resto del panel ni Configuración.
+  onboarding: ['/dashboard/onboarding/registro', '/dashboard/onboarding', '/dashboard/backoffice'],
 };
 
 const COOKIE_NAME = 'quick_session';

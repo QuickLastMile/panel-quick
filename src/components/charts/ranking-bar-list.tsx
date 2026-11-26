@@ -18,12 +18,15 @@ export default function RankingBarList({
   showPercent?: boolean;
 }) {
   const { tooltip, show, hide } = useChartTooltip();
-  const max = Math.max(...items.map((i) => i.count), 1);
+  // Valor absoluto: BackOffice suma montos de ajuste que pueden ser
+  // negativos — sin esto la barra quedaba con ancho negativo (inválido).
+  const max = Math.max(...items.map((i) => Math.abs(i.count)), 1);
   const total = items.reduce((s, i) => s + i.count, 0);
+  const hayNegativos = items.some((i) => i.count < 0);
 
   function display(count: number) {
     const base = formatValue(count);
-    if (!showPercent || !total) return base;
+    if (!showPercent || !total || hayNegativos) return base;
     const pct = Math.round((count / total) * 1000) / 10;
     return `${base} (${pct}%)`;
   }
@@ -45,7 +48,7 @@ export default function RankingBarList({
           <div className="col-span-2 h-4 overflow-hidden rounded bg-[var(--surface-sunken)] sm:col-span-1">
             <div
               className={`h-full rounded transition-[filter] duration-150 hover:brightness-110 ${!color ? 'animate-grow-width bg-gradient-gold' : 'animate-grow-width'}`}
-              style={{ width: `${(item.count / max) * 100}%`, background: color }}
+              style={{ width: `${(Math.abs(item.count) / max) * 100}%`, background: item.count < 0 ? '#e5484d' : color }}
               onMouseMove={(e) => show(e, [item.key, display(item.count)])}
               onMouseLeave={hide}
             />
